@@ -1,0 +1,3600 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Шахматы: 0 — 6000 ELO + Анализ партий</title>
+    <style>
+        /* =====================================================================
+           БАЗОВЫЕ СБРОСЫ И ЦВЕТОВЫЕ ТОКЕНЫ (БЕЗ ВНЕШНИХ ЗАВИСИМОСТЕЙ)
+           ===================================================================== */
+        :root {
+            --bg-page: #060b14;
+            --bg-surface: #0f172a;
+            --bg-surface-2: #162033;
+            --border-subtle: rgba(148, 163, 184, 0.16);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-emerald: #10b981;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+            --accent-sky: #38bdf8;
+
+            --sq-light: #eeeed2;
+            --sq-dark: #769656;
+            --sq-selected: rgba(250, 204, 21, 0.55);
+            --sq-last-move: rgba(163, 230, 53, 0.42);
+            --sq-hint: rgba(56, 189, 248, 0.48);
+        }
+
+        body.theme-wood {
+            --sq-light: #f0d9b5;
+            --sq-dark: #b58863;
+            --sq-selected: rgba(251, 191, 36, 0.55);
+            --sq-last-move: rgba(132, 204, 22, 0.4);
+        }
+
+        body.theme-ocean {
+            --sq-light: #e2e8f0;
+            --sq-dark: #3b6e8c;
+            --sq-selected: rgba(56, 189, 248, 0.55);
+            --sq-last-move: rgba(34, 211, 238, 0.36);
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            min-height: 100%;
+            background-color: var(--bg-page);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
+            line-height: 1.45;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        }
+
+        /* =====================================================================
+           ШАПКА И НАВИГАЦИЯ
+           ===================================================================== */
+        .app-header {
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            background: rgba(15, 23, 42, 0.92);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 10px 18px;
+        }
+
+        .header-inner {
+            max-width: 1320px;
+            margin: 0 auto;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+        }
+
+        .brand-logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #34d399, #0ea5e9);
+            color: #060b14;
+            font-size: 22px;
+            font-weight: 900;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 18px rgba(16, 185, 129, 0.25);
+        }
+
+        .brand-title {
+            font-size: 16px;
+            font-weight: 800;
+            letter-spacing: -0.01em;
+        }
+
+        .brand-subtitle {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .segmented {
+            display: inline-flex;
+            background: #060b14;
+            padding: 3px;
+            border-radius: 12px;
+            border: 1px solid var(--border-subtle);
+            gap: 2px;
+        }
+
+        .seg-btn {
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 700;
+            padding: 6px 12px;
+            border-radius: 9px;
+            cursor: pointer;
+            transition: all 0.16s ease;
+        }
+
+        .seg-btn:hover {
+            color: var(--text-main);
+        }
+
+        .seg-btn.active {
+            background: var(--accent-emerald);
+            color: #052e16;
+            box-shadow: 0 2px 10px rgba(16, 185, 129, 0.35);
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .time-control-pill {
+            min-height: 34px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 0 10px;
+            border: 1px solid rgba(16, 185, 129, 0.28);
+            border-radius: 10px;
+            background: rgba(16, 185, 129, 0.09);
+            color: #a7f3d0;
+            font-size: 12px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .icon-btn {
+            height: 34px;
+            padding: 0 11px;
+            border-radius: 10px;
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-surface-2);
+            color: var(--text-main);
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            transition: all 0.15s ease;
+        }
+
+        .icon-btn:hover {
+            background: #23324d;
+            border-color: rgba(148, 163, 184, 0.35);
+        }
+
+        .icon-btn.active-theme {
+            background: rgba(16, 185, 129, 0.18);
+            border-color: rgba(16, 185, 129, 0.5);
+            color: #6ee7b7;
+        }
+
+        /* =====================================================================
+           ОСНОВНАЯ СЕТКА ПРИЛОЖЕНИЯ
+           ===================================================================== */
+        .main-layout {
+            max-width: 1320px;
+            margin: 0 auto;
+            padding: 16px;
+            display: grid;
+            grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+            gap: 20px;
+            align-items: start;
+        }
+
+        @media (max-width: 980px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .board-column {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .board-frame-max {
+            width: 100%;
+            max-width: min(68vh, 580px);
+        }
+
+        /* Карточки игроков */
+        .player-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 14px;
+            padding: 8px 12px;
+        }
+
+        .player-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .player-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: var(--bg-surface-2);
+            border: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .player-name-row {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            flex-wrap: wrap;
+        }
+
+        .player-name {
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .elo-pill {
+            font-size: 11px;
+            font-weight: 800;
+            padding: 2px 7px;
+            border-radius: 7px;
+            background: rgba(59, 130, 246, 0.18);
+            color: #93c5fd;
+            border: 1px solid rgba(59, 130, 246, 0.35);
+        }
+
+        .captured-row {
+            min-height: 18px;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            font-size: 13px;
+            color: var(--text-muted);
+            flex-wrap: wrap;
+        }
+
+        .status-pill {
+            font-size: 11px;
+            font-weight: 800;
+            padding: 5px 10px;
+            border-radius: 10px;
+            background: rgba(16, 185, 129, 0.16);
+            color: #6ee7b7;
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            white-space: nowrap;
+        }
+
+        .status-pill.bot-turn {
+            background: rgba(245, 158, 11, 0.16);
+            color: #fcd34d;
+            border-color: rgba(245, 158, 11, 0.35);
+        }
+
+        .status-pill.game-over {
+            background: rgba(148, 163, 184, 0.16);
+            color: #cbd5e1;
+            border-color: rgba(148, 163, 184, 0.3);
+        }
+
+        .acc-pill {
+            font-size: 11px;
+            font-weight: 800;
+            padding: 4px 8px;
+            border-radius: 8px;
+            background: var(--bg-surface-2);
+            border: 1px solid var(--border-subtle);
+            color: #e2e8f0;
+            white-space: nowrap;
+        }
+
+        .clock-pill {
+            min-width: 72px;
+            padding: 5px 9px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 9px;
+            background: #060b14;
+            color: #e2e8f0;
+            font-size: 14px;
+            font-weight: 900;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        .clock-pill.active-clock {
+            color: #052e16;
+            background: #6ee7b7;
+            border-color: #34d399;
+            box-shadow: 0 0 14px rgba(16, 185, 129, 0.22);
+        }
+
+        .clock-pill.low-time {
+            color: #fecaca;
+            background: rgba(127, 29, 29, 0.55);
+            border-color: rgba(248, 113, 113, 0.65);
+            animation: clock-pulse 0.8s ease-in-out infinite alternate;
+        }
+
+        @keyframes clock-pulse {
+            to { box-shadow: 0 0 12px rgba(248, 113, 113, 0.4); }
+        }
+
+        .time-control-card {
+            background: #060b14;
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 10px;
+            margin-bottom: 12px;
+        }
+
+        .time-control-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .time-control-summary {
+            color: #a7f3d0;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .time-control-select,
+        .custom-time-field input {
+            min-height: 36px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 9px;
+            background: var(--bg-surface-2);
+            color: var(--text-main);
+            font: inherit;
+        }
+
+        .time-control-select {
+            width: 100%;
+            padding: 6px 9px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .custom-time-fields {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .custom-time-field {
+            display: grid;
+            gap: 4px;
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .custom-time-field input {
+            width: 100%;
+            padding: 6px 8px;
+            font-size: 13px;
+        }
+
+        .time-control-help {
+            margin-top: 7px;
+            color: var(--text-muted);
+            font-size: 10px;
+        }
+
+        /* Шкала оценки + Доска */
+        .board-stage {
+            display: flex;
+            align-items: stretch;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .eval-bar {
+            width: 24px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid var(--border-subtle);
+            background: #1e293b;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .eval-black {
+            width: 100%;
+            background: #0f172a;
+            transition: height 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .eval-white {
+            width: 100%;
+            background: #f1f5f9;
+            flex: 1;
+            transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .eval-label {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(6, 11, 20, 0.92);
+            color: #6ee7b7;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            border-radius: 5px;
+            padding: 1px 3px;
+            font-size: 9px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .board-box {
+            position: relative;
+            flex: 1;
+            aspect-ratio: 1 / 1;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.12);
+        }
+
+        .chess-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            width: 100%;
+            height: 100%;
+        }
+
+        .square {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .square.light { background: var(--sq-light); }
+        .square.dark  { background: var(--sq-dark); }
+
+        .square.last-move::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: var(--sq-last-move);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .square.selected::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: var(--sq-selected);
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .square.hint-sq::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: var(--sq-hint);
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .square.in-check {
+            background: radial-gradient(circle, rgba(239, 68, 68, 0.95) 0%, rgba(185, 28, 28, 0.78) 65%, transparent 100%) !important;
+        }
+
+        .coord {
+            position: absolute;
+            font-size: 10px;
+            font-weight: 800;
+            line-height: 1;
+            pointer-events: none;
+            z-index: 3;
+            opacity: 0.85;
+        }
+
+        .coord.rank { top: 2px; left: 4px; }
+        .coord.file { bottom: 2px; right: 4px; }
+        .square.light .coord { color: #334155; }
+        .square.dark .coord  { color: #f8fafc; }
+
+        .move-dot {
+            width: 28%;
+            height: 28%;
+            border-radius: 50%;
+            background: rgba(15, 23, 42, 0.28);
+            z-index: 6;
+            pointer-events: none;
+            transition: transform 0.14s ease;
+        }
+
+        .square:hover .move-dot {
+            transform: scale(1.2);
+        }
+
+        .capture-ring {
+            position: absolute;
+            inset: 7%;
+            border-radius: 50%;
+            border: 4px solid rgba(15, 23, 42, 0.34);
+            z-index: 6;
+            pointer-events: none;
+        }
+
+        /* Плавная фигура */
+        .piece-wrap {
+            width: 86%;
+            height: 86%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            will-change: transform;
+            transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+            touch-action: none;
+        }
+
+        .piece-wrap:hover {
+            transform: scale(1.06);
+        }
+
+        .piece-wrap.dragging-hidden {
+            opacity: 0.2;
+        }
+
+        .piece-svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.38));
+            pointer-events: none;
+        }
+
+        /* Летящая фигура при drag */
+        #dragGhost {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%) scale(1.16);
+            filter: drop-shadow(0 12px 16px rgba(0, 0, 0, 0.55));
+            will-change: left, top;
+        }
+
+        /* Значок оценки хода в углу клетки */
+        .cell-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 900;
+            color: #ffffff;
+            z-index: 25;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.55), 0 0 0 2px #0f172a;
+            pointer-events: none;
+        }
+
+        /* SVG стрелка лучшего хода */
+        .arrow-overlay {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        /* Навигация по истории */
+        .nav-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        .nav-btn {
+            padding: 8px 6px;
+            border-radius: 10px;
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-surface);
+            color: #e2e8f0;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.14s ease;
+        }
+
+        .nav-btn:hover {
+            background: var(--bg-surface-2);
+        }
+
+        /* =====================================================================
+           ПРАВАЯ ПАНЕЛЬ: НАСТРОЙКИ БОТА, ИСТОРИЯ И ОБЗОР ПАРТИИ
+           ===================================================================== */
+        .side-column {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .panel-tabs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 14px;
+            padding: 4px;
+            gap: 4px;
+        }
+
+        .panel-tab-btn {
+            padding: 9px 10px;
+            border-radius: 10px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+
+        .panel-tab-btn.active {
+            background: var(--bg-surface-2);
+            color: var(--text-main);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            padding: 14px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+        }
+
+        .card-header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .card-title {
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+        }
+
+        .elo-input-wrap {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .elo-number-input {
+            width: 86px;
+            padding: 5px 8px;
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            background: #060b14;
+            color: #fbbf24;
+            font-size: 14px;
+            font-weight: 800;
+            text-align: right;
+            outline: none;
+        }
+
+        .elo-number-input:focus {
+            border-color: var(--accent-amber);
+        }
+
+        .slider-box {
+            margin-bottom: 12px;
+        }
+
+        input[type="range"].elo-slider {
+            width: 100%;
+            height: 10px;
+            border-radius: 999px;
+            appearance: none;
+            -webkit-appearance: none;
+            background: linear-gradient(90deg, #22c55e 0%, #3b82f6 25%, #a855f7 50%, #f59e0b 75%, #ef4444 100%);
+            cursor: pointer;
+        }
+
+        input[type="range"].elo-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 3px solid #060b14;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.75);
+        }
+
+        .slider-ticks {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .bot-profile-box {
+            background: #060b14;
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 11px;
+            margin-bottom: 12px;
+            display: flex;
+            gap: 11px;
+            align-items: flex-start;
+        }
+
+        .bot-profile-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            background: var(--bg-surface-2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+
+        .bot-profile-name {
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .bot-profile-desc {
+            font-size: 11.5px;
+            color: var(--text-muted);
+            margin-top: 3px;
+        }
+
+        .presets-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .preset-btn {
+            padding: 6px 4px;
+            border-radius: 8px;
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-surface-2);
+            color: #e2e8f0;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.14s ease;
+        }
+
+        .preset-btn:hover {
+            background: #253652;
+        }
+
+        .preset-btn.omega {
+            background: rgba(244, 63, 94, 0.18);
+            border-color: rgba(244, 63, 94, 0.45);
+            color: #fda4af;
+        }
+
+        .play-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .color-seg {
+            flex: 1;
+            min-width: 190px;
+            display: flex;
+            background: #060b14;
+            padding: 3px;
+            border-radius: 10px;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .color-opt {
+            flex: 1;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 700;
+            padding: 6px 4px;
+            border-radius: 7px;
+            cursor: pointer;
+        }
+
+        .color-opt.active {
+            background: var(--bg-surface-2);
+            color: #ffffff;
+        }
+
+        .primary-btn {
+            padding: 9px 16px;
+            border-radius: 11px;
+            border: none;
+            background: linear-gradient(135deg, #f59e0b, #ea580c);
+            color: #060b14;
+            font-size: 13px;
+            font-weight: 900;
+            cursor: pointer;
+            box-shadow: 0 6px 16px rgba(234, 88, 12, 0.28);
+            transition: transform 0.12s ease;
+        }
+
+        .primary-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .emerald-btn {
+            padding: 8px 14px;
+            border-radius: 10px;
+            border: none;
+            background: var(--accent-emerald);
+            color: #052e16;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .emerald-btn:hover {
+            filter: brightness(1.08);
+        }
+
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 6px;
+        }
+
+        .action-tile {
+            padding: 8px 4px;
+            border-radius: 11px;
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-surface);
+            color: #e2e8f0;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+            transition: background 0.14s ease;
+        }
+
+        .action-tile:hover {
+            background: var(--bg-surface-2);
+        }
+
+        .coach-card {
+            background: var(--bg-surface);
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            border-radius: 14px;
+            padding: 11px 12px;
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        .coach-badge {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 900;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .history-scroll {
+            max-height: 220px;
+            overflow-y: auto;
+            padding-right: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .history-row {
+            display: grid;
+            grid-template-columns: 36px 1fr 1fr;
+            gap: 6px;
+            align-items: center;
+            font-size: 12px;
+        }
+
+        .move-chip {
+            width: 100%;
+            border: 1px solid transparent;
+            background: rgba(255, 255, 255, 0.02);
+            color: #e2e8f0;
+            border-radius: 8px;
+            padding: 5px 8px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 4px;
+        }
+
+        .move-chip:hover {
+            background: var(--bg-surface-2);
+        }
+
+        .move-chip.active {
+            background: rgba(16, 185, 129, 0.22);
+            border-color: rgba(16, 185, 129, 0.55);
+            color: #ffffff;
+        }
+
+        .mini-cls-tag {
+            padding: 1px 6px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 900;
+            color: #ffffff;
+        }
+
+        /* Обзор партии */
+        .acc-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .acc-box {
+            background: #060b14;
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .acc-box-title {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 700;
+        }
+
+        .acc-box-val {
+            font-size: 22px;
+            font-weight: 900;
+            margin-top: 2px;
+        }
+
+        .cls-table-head {
+            display: grid;
+            grid-template-columns: 64px 1fr 64px;
+            font-size: 11px;
+            font-weight: 800;
+            color: var(--text-muted);
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--border-subtle);
+            text-align: center;
+        }
+
+        .cls-row {
+            display: grid;
+            grid-template-columns: 64px 1fr 64px;
+            align-items: center;
+            padding: 7px 4px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+            font-size: 12px;
+        }
+
+        .cls-center {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: flex-start;
+            padding-left: 8px;
+            font-weight: 700;
+        }
+
+        .cls-dot-badge {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 900;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        /* Модальные окна и тост */
+        .modal-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(6, 11, 20, 0.86);
+            backdrop-filter: blur(5px);
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            text-align: center;
+        }
+
+        .promo-choices {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .promo-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            background: var(--bg-surface-2);
+            padding: 6px;
+            cursor: pointer;
+            transition: transform 0.14s ease;
+        }
+
+        .promo-btn:hover {
+            transform: scale(1.08);
+            border-color: var(--accent-emerald);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 18px;
+            left: 50%;
+            transform: translate(-50%, 16px);
+            background: #1e293b;
+            color: #f8fafc;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            border-radius: 12px;
+            padding: 9px 16px;
+            font-size: 13px;
+            font-weight: 700;
+            z-index: 10000;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.25s ease;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .piece-wrap, .seg-btn, .icon-btn, .move-dot {
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Летящая фигура при плавном перетаскивании -->
+    <div id="dragGhost" class="hidden"></div>
+
+    <!-- Шапка -->
+    <header class="app-header">
+        <div class="header-inner">
+            <div class="brand">
+                <div class="brand-logo">♔</div>
+                <div>
+                    <div class="brand-title">ШАХМАТЫ: 0 — 6000 ELO + АНАЛИЗ</div>
+                    <div class="brand-subtitle">Автономный движок, звуки шахмат, тактика и разбор ходов</div>
+                </div>
+            </div>
+
+            <div class="segmented" role="group" aria-label="Режим игры">
+                <button type="button" id="modeBotBtn" class="seg-btn active" aria-pressed="true">🤖 Игра с ботом</button>
+                <button type="button" id="modeAnalysisBtn" class="seg-btn" aria-pressed="false">🔬 Анализ / Против себя</button>
+            </div>
+
+            <div class="header-controls">
+                <span id="timeControlLabel" class="time-control-pill" title="Текущий контроль времени">♾️ Без времени</span>
+                <div class="segmented" role="group" aria-label="Тема доски">
+                    <button type="button" id="themeClassicBtn" class="seg-btn active">Зелёная</button>
+                    <button type="button" id="themeWoodBtn" class="seg-btn">Дерево</button>
+                    <button type="button" id="themeOceanBtn" class="seg-btn">Океан</button>
+                </div>
+                <button type="button" id="soundToggleBtn" class="icon-btn" title="Включить/выключить звук">
+                    <span id="soundIcon">🔊</span>
+                    <span id="soundLabel">Звук</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Основной контент -->
+    <main class="main-layout">
+
+        <!-- Левая колонка: Доска -->
+        <section class="board-column">
+            <!-- Верхний игрок -->
+            <div class="player-bar board-frame-max">
+                <div class="player-info">
+                    <div id="topAvatar" class="player-avatar">♟️</div>
+                    <div>
+                        <div class="player-name-row">
+                            <span id="topName" class="player-name">Клубный Любитель</span>
+                            <span id="topBadge" class="elo-pill mono">1200 ELO</span>
+                        </div>
+                        <div id="topCaptured" class="captured-row"></div>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <span id="topAccuracy" class="acc-pill mono hidden">Точность: —%</span>
+                    <span id="topClock" class="clock-pill hidden" aria-label="Время соперника">∞</span>
+                    <span id="thinkingBadge" class="status-pill bot-turn hidden">Думает...</span>
+                </div>
+            </div>
+
+            <!-- Шкала оценки + Доска -->
+            <div class="board-stage board-frame-max">
+                <div class="eval-bar" title="Оценка позиции (+ белые / - чёрные)">
+                    <div id="evalBlackBar" class="eval-black" style="height:50%;"></div>
+                    <div id="evalWhiteBar" class="eval-white"></div>
+                    <div id="evalLabel" class="eval-label mono">0.0</div>
+                </div>
+
+                <div class="board-box" id="boardBox">
+                    <div id="chessGrid" class="chess-grid"></div>
+                    <svg id="arrowSvg" class="arrow-overlay" viewBox="0 0 800 800"></svg>
+
+                    <!-- Выбор фигуры при превращении пешки -->
+                    <div id="promotionModal" class="modal-backdrop hidden">
+                        <div style="font-size:15px;font-weight:800;">Выберите фигуру для превращения:</div>
+                        <div id="promotionChoices" class="promo-choices"></div>
+                    </div>
+
+                    <!-- Окно окончания партии -->
+                    <div id="gameOverModal" class="modal-backdrop hidden">
+                        <div id="gameOverIcon" style="font-size:46px;margin-bottom:6px;">🏆</div>
+                        <div id="gameOverTitle" style="font-size:22px;font-weight:900;margin-bottom:4px;">Победа!</div>
+                        <div id="gameOverReason" style="font-size:13px;color:#cbd5e1;margin-bottom:14px;">Мат на доске</div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                            <button type="button" id="modalReviewBtn" class="emerald-btn">📊 Анализ партии</button>
+                            <button type="button" id="modalBoardBtn" class="icon-btn">Доска</button>
+                            <button type="button" id="modalNewGameBtn" class="primary-btn">Новая игра</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Нижний игрок -->
+            <div class="player-bar board-frame-max">
+                <div class="player-info">
+                    <div id="bottomAvatar" class="player-avatar">👤</div>
+                    <div>
+                        <div class="player-name-row">
+                            <span id="bottomName" class="player-name">Вы</span>
+                            <span id="bottomSideBadge" class="elo-pill">Белые</span>
+                        </div>
+                        <div id="bottomCaptured" class="captured-row"></div>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <span id="bottomAccuracy" class="acc-pill mono hidden">Точность: —%</span>
+                    <span id="bottomClock" class="clock-pill hidden" aria-label="Ваше время">∞</span>
+                    <span id="turnBadge" class="status-pill">Ваш ход</span>
+                </div>
+            </div>
+
+            <!-- Навигация по ходам -->
+            <div class="nav-row board-frame-max">
+                <button type="button" id="navStartBtn" class="nav-btn">⏮ Начало</button>
+                <button type="button" id="navPrevBtn" class="nav-btn">◀ Назад</button>
+                <button type="button" id="navNextBtn" class="nav-btn">Вперёд ▶</button>
+                <button type="button" id="navEndBtn" class="nav-btn">Конец ⏭</button>
+            </div>
+        </section>
+
+        <!-- Правая колонка: Настройки и Обзор партии -->
+        <aside class="side-column">
+            <div class="panel-tabs">
+                <button type="button" id="tabSetupBtn" class="panel-tab-btn active">⚙️ Параметры и Ходы</button>
+                <button type="button" id="tabReviewBtn" class="panel-tab-btn">
+                    <span>📊 Обзор партии</span>
+                    <span id="reviewReadyDot" class="hidden" style="width:8px;height:8px;border-radius:50%;background:#10b981;"></span>
+                </button>
+            </div>
+
+            <!-- Панель настроек и истории -->
+            <div id="setupPanel" style="display:flex;flex-direction:column;gap:12px;">
+
+                <!-- Настройка бота 0..6000 ELO -->
+                <div id="botSettingsCard" class="card">
+                    <div class="card-header-row">
+                        <span class="card-title">Сила бота (0 — 6000 ELO)</span>
+                        <div class="elo-input-wrap">
+                            <input type="number" id="eloNumberInput" class="elo-number-input mono" min="0" max="6000" step="50" value="1200">
+                            <span class="mono" style="font-size:12px;font-weight:800;color:#94a3b8;">ELO</span>
+                        </div>
+                    </div>
+
+                    <div class="slider-box">
+                        <input type="range" id="eloSlider" class="elo-slider" min="0" max="6000" step="50" value="1200">
+                        <div class="slider-ticks mono">
+                            <span>0</span>
+                            <span>1500</span>
+                            <span>3000</span>
+                            <span>4500</span>
+                            <span style="color:#fda4af;font-weight:800;">6000</span>
+                        </div>
+                    </div>
+
+                    <div class="bot-profile-box">
+                        <div id="botProfileIcon" class="bot-profile-icon">♟️</div>
+                        <div>
+                            <div id="botProfileName" class="bot-profile-name">Клубный Любитель</div>
+                            <div id="botProfileDesc" class="bot-profile-desc">Развивает фигуры, контролирует центр и видит базовую тактику.</div>
+                        </div>
+                    </div>
+
+                    <div class="time-control-card">
+                        <div class="time-control-heading">
+                            <label for="timeControlSelect">⏱ Контроль времени</label>
+                            <span id="timeControlSummary" class="time-control-summary">∞ Без времени</span>
+                        </div>
+                        <select id="timeControlSelect" class="time-control-select" aria-label="Выберите контроль времени">
+                            <option value="infinite">♾️ Без времени</option>
+                            <optgroup label="Bullet">
+                                <option value="bullet1">Bullet · 1 + 0</option>
+                                <option value="bullet2">Bullet · 2 + 1</option>
+                            </optgroup>
+                            <optgroup label="Blitz">
+                                <option value="blitz3">Blitz · 3 + 0</option>
+                                <option value="blitz3i2">Blitz · 3 + 2</option>
+                                <option value="blitz5">Blitz · 5 + 0</option>
+                            </optgroup>
+                            <optgroup label="Rapid">
+                                <option value="rapid10">Rapid · 10 + 0</option>
+                                <option value="rapid15i10">Rapid · 15 + 10</option>
+                                <option value="rapid30">Rapid · 30 + 0</option>
+                            </optgroup>
+                            <option value="custom">Свои настройки…</option>
+                        </select>
+                        <div id="customTimeFields" class="custom-time-fields hidden">
+                            <label class="custom-time-field">Минуты на партию
+                                <input type="number" id="customMinutes" min="0.5" max="180" step="0.5" value="5">
+                            </label>
+                            <label class="custom-time-field">Добавка за ход, сек.
+                                <input type="number" id="customIncrement" min="0" max="60" step="1" value="0">
+                            </label>
+                        </div>
+                        <p class="time-control-help">Добавка прибавляется после каждого хода. В уже начатой партии контроль не меняется.</p>
+                    </div>
+
+                    <div class="presets-grid">
+                        <button type="button" class="preset-btn" data-elo="100">100</button>
+                        <button type="button" class="preset-btn" data-elo="600">600</button>
+                        <button type="button" class="preset-btn" data-elo="1200">1200</button>
+                        <button type="button" class="preset-btn" data-elo="1800">1800</button>
+                        <button type="button" class="preset-btn" data-elo="2400">2400</button>
+                        <button type="button" class="preset-btn" data-elo="3200">3200</button>
+                        <button type="button" class="preset-btn" data-elo="4500">4500</button>
+                        <button type="button" class="preset-btn omega" data-elo="6000">6000 🔥</button>
+                    </div>
+
+                    <div class="play-row">
+                        <div class="color-seg">
+                            <button type="button" id="colorWhiteBtn" class="color-opt active">♔ Белые</button>
+                            <button type="button" id="colorRandomBtn" class="color-opt">🎲 Случайно</button>
+                            <button type="button" id="colorBlackBtn" class="color-opt">♚ Чёрные</button>
+                        </div>
+                        <button type="button" id="newGameBtn" class="primary-btn">Новая игра</button>
+                    </div>
+                </div>
+
+                <!-- Карточка режима "Анализ / Против себя" -->
+                <div id="analysisModeCard" class="card hidden" style="border-color:rgba(16,185,129,0.4);">
+                    <div class="card-header-row">
+                        <span class="card-title" style="color:#6ee7b7;">🔬 Режим анализа (против себя)</span>
+                        <button type="button" id="resetSandboxBtn" class="emerald-btn">Новая позиция</button>
+                    </div>
+                    <p style="font-size:12px;color:#cbd5e1;margin-bottom:10px;">
+                        Ходите за белых и чёрных по очереди, проверяйте тактики и комбинации. Зелёная стрелка подскажет сильнейший ход.
+                    </p>
+                    <label style="display:flex;align-items:center;justify-content:space-between;background:#060b14;padding:8px 10px;border-radius:10px;border:1px solid var(--border-subtle);cursor:pointer;font-size:12px;font-weight:700;">
+                        <span>Показывать стрелку лучшего хода</span>
+                        <input type="checkbox" id="liveArrowCheckbox" checked style="width:16px;height:16px;accent-color:#10b981;cursor:pointer;">
+                    </label>
+                </div>
+
+                <!-- Кнопки действий -->
+                <div class="actions-grid">
+                    <button type="button" id="undoBtn" class="action-tile"><span>↩️</span><span>Отмена</span></button>
+                    <button type="button" id="hintBtn" class="action-tile"><span>💡</span><span>Ход</span></button>
+                    <button type="button" id="analyzeBtn" class="action-tile"><span>📊</span><span>Анализ</span></button>
+                    <button type="button" id="flipBtn" class="action-tile"><span>🔄</span><span>Поворот</span></button>
+                    <button type="button" id="resignBtn" class="action-tile"><span>🏳️</span><span>Сдаться</span></button>
+                </div>
+
+                <!-- Комментарий по выбранному ходу -->
+                <div id="coachBox" class="coach-card hidden">
+                    <div id="coachBadge" class="coach-badge" style="background:#96bc4b;">★</div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                            <span id="coachTitle" style="font-size:12px;font-weight:800;">1. e4 — Лучший</span>
+                            <span id="coachEval" class="mono" style="font-size:11px;font-weight:800;color:#94a3b8;">+0.3</span>
+                        </div>
+                        <div id="coachText" style="font-size:11.5px;color:#cbd5e1;margin-top:2px;"></div>
+                    </div>
+                </div>
+
+                <!-- История ходов -->
+                <div class="card">
+                    <div class="card-header-row">
+                        <span class="card-title">История ходов</span>
+                        <span id="moveCountLabel" class="mono" style="font-size:12px;color:#94a3b8;">Ход: 1</span>
+                    </div>
+                    <div id="historyList" class="history-scroll mono">
+                        <div style="text-align:center;color:#64748b;padding:24px 8px;font-family:sans-serif;font-size:12px;">
+                            Сделайте первый ход, чтобы начать партию
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Панель Обзора партии -->
+            <div id="reviewPanel" class="card hidden">
+                <div class="card-header-row">
+                    <div>
+                        <div style="font-size:14px;font-weight:900;">📊 Обзор и оценка партии</div>
+                        <div style="font-size:11px;color:#94a3b8;">Точность и классификация всех 10 типов ходов</div>
+                    </div>
+                    <button type="button" id="recalcReviewBtn" class="emerald-btn">🔄 Анализировать</button>
+                </div>
+
+                <div class="acc-grid">
+                    <div class="acc-box">
+                        <div class="acc-box-title">♔ Точность Белых</div>
+                        <div id="whiteAccVal" class="acc-box-val mono">—%</div>
+                    </div>
+                    <div class="acc-box">
+                        <div class="acc-box-title">♚ Точность Чёрных</div>
+                        <div id="blackAccVal" class="acc-box-val mono" style="color:#fbbf24;">—%</div>
+                    </div>
+                </div>
+
+                <div class="cls-table-head">
+                    <div>Белые</div>
+                    <div>Тип хода</div>
+                    <div>Чёрные</div>
+                </div>
+                <div id="classificationRows"></div>
+            </div>
+        </aside>
+    </main>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+    (function () {
+        'use strict';
+
+        /* =====================================================================
+           1. ВЕКТОРНЫЕ SVG-ФИГУРЫ (БЕЛЫЕ И ЧЁРНЫЕ)
+           ===================================================================== */
+        const PIECE_SVG = {
+            wK: `<svg viewBox="0 0 45 45" class="piece-svg"><g fill="none" stroke="#111827" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22.5 11.63V6M20 8h5"/><path d="M22.5 25s4.5-7.5 3-10.5c0 0-1-2.5-3-2.5s-3 2.5-3 2.5c-1.5 3 3 10.5 3 10.5" fill="#ffffff"/><path d="M11.5 37c5.5 3.5 15.5 3.5 21 0v-7s9-4.5 6-10.5c-4-6.5-13.5-3.5-16 4V27v-3.5c-3.5-7.5-13-10.5-16-4-3 6 5 10 5 10V37z" fill="#ffffff"/><path d="M11.5 30c5.5-3 15.5-3 21 0m-21 3.5c5.5-3 15.5-3 21 0m-21 3.5c5.5-3 15.5-3 21 0"/></g></svg>`,
+            wQ: `<svg viewBox="0 0 45 45" class="piece-svg"><g fill="#ffffff" stroke="#111827" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="12" r="2"/><circle cx="14" cy="9" r="2"/><circle cx="22.5" cy="8" r="2"/><circle cx="31" cy="9" r="2"/><circle cx="39" cy="12" r="2"/><path d="M9 26c8.5-1.5 21-1.5 27 0l2-12-7 11V11l-5.5 13.5-3-15-3 15-5.5-14V25L7 14l2 12z"/><path d="M9 26c0 2 1.5 2 2.5 4 1 1.5 1 1 .5 3.5-1.5 1-1.5 2.5-1.5 2.5-1.5 1.5.5 2.5.5 2.5 6.5 1 16.5 1 23 0 0 0 1.5-1 0-2.5 0 0 .5-1.5-1-2.5-.5-2.5-.5-2 .5-3.5 1-2 2.5-2 2.5-4-8.5-1.5-18.5-1.5-27 0z"/><path d="M11.5 30c3.5-1 18.5-1 22 0M12 33.5c6-1 15-1 21 0" fill="none"/></g></svg>`,
+            wR: `<svg viewBox="0 0 45 45" class="piece-svg"><g fill="#ffffff" stroke="#111827" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 39h27v-3H9v3zM12 36v-4h21v4H12zM11 14V9h4v2h5V9h5v2h5V9h4v5"/><path d="M34 14l-3 3H14l-3-3M31 17v12.5H14V17M31 29.5l1.5 2.5h-20l1.5-2.5M11 14h23" fill="none"/></g></svg>`,
+            wB: `<svg viewBox="0 0 45 45" class="piece-svg"><g fill="none" stroke="#111827" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><g fill="#ffffff"><path d="M9 36c3.39-.97 10.11.43 13.5-2 3.39 2.43 10.11 1.03 13.5 2 0 0 1.65.54 3 2-.68.97-1.65.99-3 .5-3.39-.97-10.11.46-13.5-1-3.39 1.46-10.11.03-13.5 1-1.35.49-2.32.47-3-.5 1.35-1.94 3-2 3-2z"/><path d="M15 32c2.5 2.5 12.5 2.5 15 0 .5-1.5 0-2 0-2 0-2.5-2.5-4-2.5-4 5.5-1.5 6-11.5-5-15.5-11 4-10.5 14-5 15.5 0 0-2.5 1.5-2.5 4 0 0-.5.5 0 2z"/><circle cx="22.5" cy="8" r="2.5"/></g><path d="M17.5 26h10M15 30h15m-7.5-14.5v5M20 18h5"/></g></svg>`,
+            wN: `<svg viewBox="0 0 45 45" class="piece-svg"><g fill="none" stroke="#111827" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10c10.5 1 16.5 8 16 29H15c0-9 10-6.5 8-21" fill="#ffffff"/><path d="M24 18c.38 2.91-5.55 7.37-8 9-3 2-2.82 4.34-5 4-1.04-.94 1.41-3.04 0-3-1 0 .19 1.23-1 2-1 0-4 1-4-4 0-2 6-12 6-12s1.89-1.9 2-3.5c-.73-.99-.5-2-.5-3 1-1 3 2.5 3 2.5h2s.78-1.99 2.5-3c1 0 1 3 1 3z" fill="#ffffff"/><circle cx="9.5" cy="25.5" r="0.8" fill="#111827"/></g></svg>`,
+            wP: `<svg viewBox="0 0 45 45" class="piece-svg"><path d="M22.5 9c-2.21 0-4 1.79-4 4 0 .89.29 1.71.78 2.38C17.33 16.5 16 18.59 16 21c0 2.03.94 3.84 2.41 5.03-3 1.06-7.41 5.55-7.41 13.47h23c0-7.92-4.41-12.41-7.41-13.47 1.47-1.19 2.41-3 2.41-5.03 0-2.41-1.33-4.5-3.28-5.62.49-.67.78-1.49.78-2.38 0-2.21-1.79-4-4-4z" fill="#ffffff" stroke="#111827" stroke-width="1.6" stroke-linecap="round"/></svg>`,
+
+            bK: `<svg viewBox="0 0 45 45" class="piece-svg"><g fill="none" stroke="#0f172a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22.5 11.63V6M20 8h5"/><path d="M22.5 25s4.5-7.5 3-10.5c0 0-1-2.5-3-2.5s-3 2.5-3 2.5c-1.5 3 3 10.5 3 10.5" fill="#1e293b"/><path d="M11.5 37c5.5 3.5 15.5 3.5 21 0v-7s9-4.5 6-10.5c-4-6.5-13.5-3.5-16 4V27v-3.5c-3.5-7.5-13-10.5-16-4-3 6 5 10 5 10V37z" fill="#1e293b"/><path d="M11.5 30c5.5-3 15.5-3 21 0m-21 3.5c5.5-3 15.5-3 21 0m-21 3.5c5.5-3 15.5-3 21 0" stroke="#e2e8f0" stroke-width="1.2"/></g></svg>`,
+            bQ: `<svg viewBox="0 0 45 45" class="piece-svg"><g fill="#1e293b" stroke="#0f172a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="12" r="2.2"/><circle cx="14" cy="9" r="2.2"/><circle cx="22.5" cy="8" r="2.2"/><circle cx="31" cy="9" r="2.2"/><circle cx="39" cy="12" r="2.2"/><path d="M9 26c8.5-1.5 21-1.5 27 0l2.5-12.5L31 25l-.3-14.1-5.2 13.6-3-14.5-3 14.5-5.2-13.6L14 25 6.5 13.5 9 26z"/><path d="M9 26c0 2 1.5 2 2.5 4 1 1.5 1 1 .5 3.5-1.5 1-1.5 2.5-1.5 2.5-1.5 1.5.5 2.5.5 2.5 6.5 1 16.5 1 23 0 0 0 1.5-1 0-2.5 0 0 .5-1.5-1-2.5-.5-2.5-.5-2 .5-3.5 1-2 2.5-2 2.5-4-8.5-1.5-18.5-1.5-27 0z"/><path d="M11.5 30c3.5-1 18.5-1 22 0M12 33.5c6-1 15-1 21 0" fill="none" stroke="#e2e8f0" stroke-width="1.1"/></g></svg>`,
+            bR: `<svg viewBox="0 0 45 45" class="piece-svg"><g fill="#1e293b" stroke="#0f172a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 39h27v-3H9v3zM12.5 32l1.5-2.5h17l1.5 2.5h-20zM12 36v-4h21v4H12z"/><path d="M14 29.5v-13h17v13H14zM14 16.5L11 14h23l-3 2.5H14zM11 14V9h4v2h5V9h5v2h5V9h4v5H11z"/><path d="M12 35.5h21M14 29.5h17M14 16.5h17" fill="none" stroke="#e2e8f0" stroke-width="1.1"/></g></svg>`,
+            bB: `<svg viewBox="0 0 45 45" class="piece-svg"><g fill="none" stroke="#0f172a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><g fill="#1e293b"><path d="M9 36c3.39-.97 10.11.43 13.5-2 3.39 2.43 10.11 1.03 13.5 2 0 0 1.65.54 3 2-.68.97-1.65.99-3 .5-3.39-.97-10.11.46-13.5-1-3.39 1.46-10.11.03-13.5 1-1.35.49-2.32.47-3-.5 1.35-1.94 3-2 3-2z"/><path d="M15 32c2.5 2.5 12.5 2.5 15 0 .5-1.5 0-2 0-2 0-2.5-2.5-4-2.5-4 5.5-1.5 6-11.5-5-15.5-11 4-10.5 14-5 15.5 0 0-2.5 1.5-2.5 4 0 0-.5.5 0 2z"/><circle cx="22.5" cy="8" r="2.5"/></g><path d="M17.5 26h10M15 30h15m-7.5-14.5v5M20 18h5" stroke="#e2e8f0" stroke-width="1.2"/></g></svg>`,
+            bN: `<svg viewBox="0 0 45 45" class="piece-svg"><g fill="none" stroke="#0f172a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10c10.5 1 16.5 8 16 29H15c0-9 10-6.5 8-21" fill="#1e293b"/><path d="M24 18c.38 2.91-5.55 7.37-8 9-3 2-2.82 4.34-5 4-1.04-.94 1.41-3.04 0-3-1 0 .19 1.23-1 2-1 0-4 1-4-4 0-2 6-12 6-12s1.89-1.9 2-3.5c-.73-.99-.5-2-.5-3 1-1 3 2.5 3 2.5h2s.78-1.99 2.5-3c1 0 1 3 1 3z" fill="#1e293b"/><circle cx="9.5" cy="25.5" r="0.8" fill="#e2e8f0" stroke="#e2e8f0"/></g></svg>`,
+            bP: `<svg viewBox="0 0 45 45" class="piece-svg"><path d="M22.5 9c-2.21 0-4 1.79-4 4 0 .89.29 1.71.78 2.38C17.33 16.5 16 18.59 16 21c0 2.03.94 3.84 2.41 5.03-3 1.06-7.41 5.55-7.41 13.47h23c0-7.92-4.41-12.41-7.41-13.47 1.47-1.19 2.41-3 2.41-5.03 0-2.41-1.33-4.5-3.28-5.62.49-.67.78-1.49.78-2.38 0-2.21-1.79-4-4-4z" fill="#1e293b" stroke="#0f172a" stroke-width="1.6" stroke-linecap="round"/></svg>`
+        };
+
+        /* =====================================================================
+           2. ЗВУКОВОЙ ДВИЖОК (WEB AUDIO API)
+           ===================================================================== */
+        class ChessAudio {
+            constructor() {
+                this.muted = false;
+                this.ctx = null;
+                this.noiseBuffer = null;
+            }
+
+            ensureContext() {
+                if (this.muted) return null;
+                const AC = window.AudioContext || window.webkitAudioContext;
+                if (!AC) return null;
+                if (!this.ctx) {
+                    this.ctx = new AC();
+                    const sr = this.ctx.sampleRate;
+                    this.noiseBuffer = this.ctx.createBuffer(1, Math.floor(sr * 0.15), sr);
+                    const ch = this.noiseBuffer.getChannelData(0);
+                    for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume().catch(function () {});
+                }
+                return this.ctx;
+            }
+
+            woodTap(delaySec, pitch, vol) {
+                const ctx = this.ensureContext();
+                if (!ctx) return;
+                const t = ctx.currentTime + delaySec;
+
+                const osc = ctx.createOscillator();
+                const g = ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(pitch * 1.4, t);
+                osc.frequency.exponentialRampToValueAtTime(pitch * 0.5, t + 0.065);
+
+                g.gain.setValueAtTime(vol, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.075);
+
+                osc.connect(g);
+                g.connect(ctx.destination);
+                osc.start(t);
+                osc.stop(t + 0.08);
+
+                if (this.noiseBuffer) {
+                    const src = ctx.createBufferSource();
+                    src.buffer = this.noiseBuffer;
+                    const flt = ctx.createBiquadFilter();
+                    flt.type = 'bandpass';
+                    flt.frequency.setValueAtTime(920, t);
+                    flt.Q.setValueAtTime(2.0, t);
+                    const ng = ctx.createGain();
+                    ng.gain.setValueAtTime(vol * 0.65, t);
+                    ng.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+                    src.connect(flt);
+                    flt.connect(ng);
+                    ng.connect(ctx.destination);
+                    src.start(t);
+                    src.stop(t + 0.035);
+                }
+            }
+
+            play(kind) {
+                if (this.muted) return;
+                try {
+                    const ctx = this.ensureContext();
+                    if (!ctx) return;
+                    const now = ctx.currentTime;
+
+                    if (kind === 'move') {
+                        this.woodTap(0, 175, 0.2);
+                        this.softTone(440, 0.01, 0.14, 0.035);
+                    } else if (kind === 'capture') {
+                        this.woodTap(0, 180, 0.22);
+                        this.woodTap(0.045, 125, 0.34);
+                    } else if (kind === 'castle') {
+                        this.woodTap(0, 170, 0.2);
+                        this.woodTap(0.085, 145, 0.24);
+                    } else if (kind === 'check') {
+                        this.woodTap(0, 145, 0.2);
+                        this.softTone(523.25, 0.015, 0.25, 0.11);
+                        this.softTone(659.25, 0.12, 0.29, 0.08);
+                    } else if (kind === 'promote') {
+                        this.woodTap(0, 190, 0.22);
+                        [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+                            const o = ctx.createOscillator();
+                            const g = ctx.createGain();
+                            o.type = 'sine';
+                            o.frequency.setValueAtTime(f, now + i * 0.05);
+                            g.gain.setValueAtTime(0.1, now + i * 0.05);
+                            g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.05 + 0.2);
+                            o.connect(g);
+                            g.connect(ctx.destination);
+                            o.start(now + i * 0.05);
+                            o.stop(now + i * 0.05 + 0.22);
+                        });
+                    } else if (kind === 'brilliant') {
+                        [659.25, 987.77, 1318.51].forEach((f, i) => {
+                            const o = ctx.createOscillator();
+                            const g = ctx.createGain();
+                            o.type = 'sine';
+                            o.frequency.setValueAtTime(f, now + i * 0.045);
+                            g.gain.setValueAtTime(0.15, now + i * 0.045);
+                            g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.045 + 0.32);
+                            o.connect(g);
+                            g.connect(ctx.destination);
+                            o.start(now + i * 0.045);
+                            o.stop(now + i * 0.045 + 0.35);
+                        });
+                    } else if (kind === 'gameover') {
+                        [440, 349.23, 293.66, 220].forEach((f, i) => {
+                            const o = ctx.createOscillator();
+                            const g = ctx.createGain();
+                            o.type = 'triangle';
+                            o.frequency.setValueAtTime(f, now + i * 0.1);
+                            g.gain.setValueAtTime(0.2, now + i * 0.1);
+                            g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.35);
+                            o.connect(g);
+                            g.connect(ctx.destination);
+                            o.start(now + i * 0.1);
+                            o.stop(now + i * 0.1 + 0.38);
+                        });
+                    }
+                } catch (err) {
+                    // Безопасно игнорируем при отсутствии аудиоустройства
+                }
+            }
+
+            softTone(frequency, delay, duration, volume) {
+                const ctx = this.ensureContext();
+                if (!ctx) return;
+                const start = ctx.currentTime + delay;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(frequency, start);
+                gain.gain.setValueAtTime(0.001, start);
+                gain.gain.linearRampToValueAtTime(volume, start + 0.025);
+                gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(start);
+                osc.stop(start + duration + 0.01);
+            }
+        }
+        const audio = new ChessAudio();
+
+        /* =====================================================================
+           3. КЛАССИФИКАЦИЯ ХОДОВ (10 КАТЕГОРИЙ) И ПРОФИЛИ БОТОВ (0..6000 ELO)
+           ===================================================================== */
+        const CLS_META = {
+            brilliant: {
+                key: 'brilliant', symbol: '!!', name: 'Блестящий', color: '#1baca6',
+                desc: 'Лучший ход в позиции, включающий неочевидную и выгодную жертву материала.'
+            },
+            great: {
+                key: 'great', symbol: '!', name: 'Замечательный', color: '#5c8bb0',
+                desc: 'Единственный сильный ход в критической позиции, сохраняющий перевес или спасение.'
+            },
+            best: {
+                key: 'best', symbol: '★', name: 'Лучший', color: '#96bc4b',
+                desc: 'Самый сильный ход по первой линии движка.'
+            },
+            excellent: {
+                key: 'excellent', symbol: '👍', name: 'Прекрасный', color: '#96af8b',
+                desc: 'Почти такой же сильный ход, как лучший, с минимальной потерей оценки.'
+            },
+            good: {
+                key: 'good', symbol: '✓', name: 'Хороший', color: '#95b776',
+                desc: 'Нормальный, крепкий ход, не портящий позицию.'
+            },
+            book: {
+                key: 'book', symbol: '📖', name: 'Книжный', color: '#a88865',
+                desc: 'Стандартный теоретический ход из дебютной базы знаний.'
+            },
+            inaccuracy: {
+                key: 'inaccuracy', symbol: '?!', name: 'Неточность', color: '#f7c631',
+                desc: 'Слабый ход, упускающий часть перевеса или слегка ухудшающий позицию.'
+            },
+            mistake: {
+                key: 'mistake', symbol: '?', name: 'Ошибка', color: '#e6912c',
+                desc: 'Серьёзный просчёт, заметно ухудшающий позицию в пользу соперника.'
+            },
+            miss: {
+                key: 'miss', symbol: '❌', name: 'Упущенный шанс', color: '#ca3431',
+                desc: 'Упущена тактическая возможность наказать соперника или получить решающий перевес.'
+            },
+            blunder: {
+                key: 'blunder', symbol: '??', name: 'Зевок', color: '#fa412d',
+                desc: 'Грубейшая ошибка, ведущая к потере материала, мату или проигрышу.'
+            }
+        };
+
+        const CLS_LIST = [
+            'brilliant', 'great', 'best', 'excellent', 'good',
+            'book', 'inaccuracy', 'mistake', 'miss', 'blunder'
+        ];
+
+        function getBotProfile(elo) {
+            if (elo <= 300) {
+                return { icon: '🐣', name: 'Случайный Новичок', desc: 'Делает случайные ходы и часто зевает фигуры.' };
+            }
+            if (elo <= 800) {
+                return { icon: '🧢', name: 'Дворовый Игрок', desc: 'Ищет простые взятия, но не всегда замечает ответные удары.' };
+            }
+            if (elo <= 1300) {
+                return { icon: '♟️', name: 'Клубный Любитель', desc: 'Развивает фигуры, контролирует центр и видит базовую тактику.' };
+            }
+            if (elo <= 1800) {
+                return { icon: '🎓', name: 'Разрядник', desc: 'Учитывает позиционную ценность полей и наказывает за зевки.' };
+            }
+            if (elo <= 2400) {
+                return { icon: '🎖️', name: 'Кандидат в Мастера', desc: 'Применяет альфа-бета поиск и сортировку взятий MVV-LVA.' };
+            }
+            if (elo <= 3200) {
+                return { icon: '👑', name: 'Гроссмейстер', desc: 'Использует дебютную книгу, поиск спокойствия и точный расчёт.' };
+            }
+            if (elo <= 4500) {
+                return { icon: '⚡', name: 'Супердвижок', desc: 'Глубокий поиск, пара слонов, безопасность короля и активность фигур.' };
+            }
+            return { icon: '👁️‍🗨️', name: 'ОМЕГА-ИИ (6000 ELO)', desc: 'Максимальная глубина поиска с кэшем позиций и беспощадной тактикой.' };
+        }
+
+        /* =====================================================================
+           4. ШАХМАТНЫЙ ДВИЖОК (ПРАВИЛА, ХОДЫ, ШАХ/МАТ/ПАТ)
+           ===================================================================== */
+        const VAL = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
+
+        class ChessGame {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.board = Array.from({ length: 8 }, () => Array(8).fill(null));
+                const back = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'];
+                for (let c = 0; c < 8; c++) {
+                    this.board[0][c] = { type: back[c], color: 'b' };
+                    this.board[1][c] = { type: 'p', color: 'b' };
+                    this.board[6][c] = { type: 'p', color: 'w' };
+                    this.board[7][c] = { type: back[c], color: 'w' };
+                }
+                this.turn = 'w';
+                this.castling = { wK: true, wQ: true, bK: true, bQ: true };
+                this.enPassant = null;
+                this.halfMoveClock = 0;
+                this.fullMoveNumber = 1;
+                this.history = [];
+                this.posCounts = new Map();
+                this.recordPos();
+            }
+
+            cloneState() {
+                return {
+                    board: this.board.map(row => row.map(cell => (cell ? { ...cell } : null))),
+                    turn: this.turn,
+                    castling: { ...this.castling },
+                    enPassant: this.enPassant ? { ...this.enPassant } : null,
+                    halfMoveClock: this.halfMoveClock,
+                    fullMoveNumber: this.fullMoveNumber
+                };
+            }
+
+            restoreState(st) {
+                this.board = st.board.map(row => row.map(cell => (cell ? { ...cell } : null)));
+                this.turn = st.turn;
+                this.castling = { ...st.castling };
+                this.enPassant = st.enPassant ? { ...st.enPassant } : null;
+                this.halfMoveClock = st.halfMoveClock;
+                this.fullMoveNumber = st.fullMoveNumber;
+            }
+
+            posKey() {
+                let k = this.turn + '|';
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const p = this.board[r][c];
+                        k += p ? (p.color + p.type) : '..';
+                    }
+                }
+                k += `|${this.castling.wK ? 1 : 0}${this.castling.wQ ? 1 : 0}${this.castling.bK ? 1 : 0}${this.castling.bQ ? 1 : 0}`;
+                if (this.enPassant) k += `|${this.enPassant.r},${this.enPassant.c}`;
+                return k;
+            }
+
+            recordPos() {
+                const k = this.posKey();
+                this.posCounts.set(k, (this.posCounts.get(k) || 0) + 1);
+            }
+
+            inBounds(r, c) {
+                return r >= 0 && r < 8 && c >= 0 && c < 8;
+            }
+
+            findKing(color) {
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const p = this.board[r][c];
+                        if (p && p.color === color && p.type === 'k') return { r, c };
+                    }
+                }
+                return null;
+            }
+
+            isAttacked(r, c, byColor) {
+                const pDir = byColor === 'w' ? 1 : -1;
+                for (const dc of [-1, 1]) {
+                    const pr = r + pDir, pc = c + dc;
+                    if (this.inBounds(pr, pc)) {
+                        const p = this.board[pr][pc];
+                        if (p && p.color === byColor && p.type === 'p') return true;
+                    }
+                }
+                const nJumps = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+                for (const [dr, dc] of nJumps) {
+                    const nr = r + dr, nc = c + dc;
+                    if (this.inBounds(nr, nc)) {
+                        const p = this.board[nr][nc];
+                        if (p && p.color === byColor && p.type === 'n') return true;
+                    }
+                }
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        if (!dr && !dc) continue;
+                        const kr = r + dr, kc = c + dc;
+                        if (this.inBounds(kr, kc)) {
+                            const p = this.board[kr][kc];
+                            if (p && p.color === byColor && p.type === 'k') return true;
+                        }
+                    }
+                }
+                const ortho = [[-1,0],[1,0],[0,-1],[0,1]];
+                for (const [dr, dc] of ortho) {
+                    let nr = r + dr, nc = c + dc;
+                    while (this.inBounds(nr, nc)) {
+                        const p = this.board[nr][nc];
+                        if (p) {
+                            if (p.color === byColor && (p.type === 'r' || p.type === 'q')) return true;
+                            break;
+                        }
+                        nr += dr; nc += dc;
+                    }
+                }
+                const diag = [[-1,-1],[-1,1],[1,-1],[1,1]];
+                for (const [dr, dc] of diag) {
+                    let nr = r + dr, nc = c + dc;
+                    while (this.inBounds(nr, nc)) {
+                        const p = this.board[nr][nc];
+                        if (p) {
+                            if (p.color === byColor && (p.type === 'b' || p.type === 'q')) return true;
+                            break;
+                        }
+                        nr += dr; nc += dc;
+                    }
+                }
+                return false;
+            }
+
+            isInCheck(color) {
+                const k = this.findKing(color);
+                if (!k) return false;
+                return this.isAttacked(k.r, k.c, color === 'w' ? 'b' : 'w');
+            }
+
+            pseudoMoves(color, onlyCaptures = false) {
+                const moves = [];
+                const enemy = color === 'w' ? 'b' : 'w';
+
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const p = this.board[r][c];
+                        if (!p || p.color !== color) continue;
+
+                        if (p.type === 'p') {
+                            const dir = color === 'w' ? -1 : 1;
+                            const startR = color === 'w' ? 6 : 1;
+                            const promoR = color === 'w' ? 0 : 7;
+
+                            if (!onlyCaptures) {
+                                const r1 = r + dir;
+                                if (this.inBounds(r1, c) && !this.board[r1][c]) {
+                                    if (r1 === promoR) {
+                                        for (const pr of ['q', 'r', 'b', 'n']) {
+                                            moves.push({ from: { r, c }, to: { r: r1, c }, piece: p, promotion: pr });
+                                        }
+                                    } else {
+                                        moves.push({ from: { r, c }, to: { r: r1, c }, piece: p });
+                                        const r2 = r + dir * 2;
+                                        if (r === startR && !this.board[r2][c]) {
+                                            moves.push({ from: { r, c }, to: { r: r2, c }, piece: p, isDoublePawn: true });
+                                        }
+                                    }
+                                }
+                            }
+                            for (const dc of [-1, 1]) {
+                                const tr = r + dir, tc = c + dc;
+                                if (!this.inBounds(tr, tc)) continue;
+                                const target = this.board[tr][tc];
+                                if (target && target.color === enemy) {
+                                    if (tr === promoR) {
+                                        for (const pr of ['q', 'r', 'b', 'n']) {
+                                            moves.push({ from: { r, c }, to: { r: tr, c: tc }, piece: p, captured: target, promotion: pr });
+                                        }
+                                    } else {
+                                        moves.push({ from: { r, c }, to: { r: tr, c: tc }, piece: p, captured: target });
+                                    }
+                                } else if (this.enPassant && this.enPassant.r === tr && this.enPassant.c === tc) {
+                                    moves.push({ from: { r, c }, to: { r: tr, c: tc }, piece: p, captured: this.board[r][tc], isEnPassant: true });
+                                }
+                            }
+                        } else if (p.type === 'n') {
+                            const jumps = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+                            for (const [dr, dc] of jumps) {
+                                const tr = r + dr, tc = c + dc;
+                                if (!this.inBounds(tr, tc)) continue;
+                                const t = this.board[tr][tc];
+                                if (!t && !onlyCaptures) moves.push({ from: { r, c }, to: { r: tr, c: tc }, piece: p });
+                                else if (t && t.color === enemy) moves.push({ from: { r, c }, to: { r: tr, c: tc }, piece: p, captured: t });
+                            }
+                        } else if (p.type === 'b' || p.type === 'r' || p.type === 'q') {
+                            const dirs = [];
+                            if (p.type === 'r' || p.type === 'q') dirs.push([-1,0],[1,0],[0,-1],[0,1]);
+                            if (p.type === 'b' || p.type === 'q') dirs.push([-1,-1],[-1,1],[1,-1],[1,1]);
+                            for (const [dr, dc] of dirs) {
+                                let tr = r + dr, tc = c + dc;
+                                while (this.inBounds(tr, tc)) {
+                                    const t = this.board[tr][tc];
+                                    if (!t) {
+                                        if (!onlyCaptures) moves.push({ from: { r, c }, to: { r: tr, c: tc }, piece: p });
+                                    } else {
+                                        if (t.color === enemy) moves.push({ from: { r, c }, to: { r: tr, c: tc }, piece: p, captured: t });
+                                        break;
+                                    }
+                                    tr += dr; tc += dc;
+                                }
+                            }
+                        } else if (p.type === 'k') {
+                            for (let dr = -1; dr <= 1; dr++) {
+                                for (let dc = -1; dc <= 1; dc++) {
+                                    if (!dr && !dc) continue;
+                                    const tr = r + dr, tc = c + dc;
+                                    if (!this.inBounds(tr, tc)) continue;
+                                    const t = this.board[tr][tc];
+                                    if (!t && !onlyCaptures) moves.push({ from: { r, c }, to: { r: tr, c: tc }, piece: p });
+                                    else if (t && t.color === enemy) moves.push({ from: { r, c }, to: { r: tr, c: tc }, piece: p, captured: t });
+                                }
+                            }
+                            if (!onlyCaptures) {
+                                const row = color === 'w' ? 7 : 0;
+                                if (r === row && c === 4 && !this.isAttacked(row, 4, enemy)) {
+                                    const canK = color === 'w' ? this.castling.wK : this.castling.bK;
+                                    if (canK && !this.board[row][5] && !this.board[row][6] &&
+                                        this.board[row][7]?.type === 'r' && this.board[row][7]?.color === color &&
+                                        !this.isAttacked(row, 5, enemy) && !this.isAttacked(row, 6, enemy)) {
+                                        moves.push({ from: { r: row, c: 4 }, to: { r: row, c: 6 }, piece: p, isCastle: 'K' });
+                                    }
+                                    const canQ = color === 'w' ? this.castling.wQ : this.castling.bQ;
+                                    if (canQ && !this.board[row][3] && !this.board[row][2] && !this.board[row][1] &&
+                                        this.board[row][0]?.type === 'r' && this.board[row][0]?.color === color &&
+                                        !this.isAttacked(row, 3, enemy) && !this.isAttacked(row, 2, enemy)) {
+                                        moves.push({ from: { r: row, c: 4 }, to: { r: row, c: 2 }, piece: p, isCastle: 'Q' });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                return moves;
+            }
+
+            applyFast(m) {
+                const undo = {
+                    castling: { ...this.castling },
+                    enPassant: this.enPassant ? { ...this.enPassant } : null,
+                    halfMoveClock: this.halfMoveClock,
+                    fullMoveNumber: this.fullMoveNumber,
+                    captured: this.board[m.to.r][m.to.c],
+                    moved: this.board[m.from.r][m.from.c]
+                };
+                const p = this.board[m.from.r][m.from.c];
+                this.board[m.to.r][m.to.c] = m.promotion ? { type: m.promotion, color: p.color } : p;
+                this.board[m.from.r][m.from.c] = null;
+
+                if (m.isEnPassant) {
+                    undo.epPos = { r: m.from.r, c: m.to.c };
+                    undo.captured = this.board[m.from.r][m.to.c];
+                    this.board[m.from.r][m.to.c] = null;
+                }
+                if (m.isCastle === 'K') {
+                    this.board[m.from.r][5] = this.board[m.from.r][7];
+                    this.board[m.from.r][7] = null;
+                } else if (m.isCastle === 'Q') {
+                    this.board[m.from.r][3] = this.board[m.from.r][0];
+                    this.board[m.from.r][0] = null;
+                }
+
+                if (p.type === 'k') {
+                    if (p.color === 'w') { this.castling.wK = false; this.castling.wQ = false; }
+                    else { this.castling.bK = false; this.castling.bQ = false; }
+                }
+                if (m.from.r === 7 && m.from.c === 0) this.castling.wQ = false;
+                if (m.from.r === 7 && m.from.c === 7) this.castling.wK = false;
+                if (m.from.r === 0 && m.from.c === 0) this.castling.bQ = false;
+                if (m.from.r === 0 && m.from.c === 7) this.castling.bK = false;
+                if (m.to.r === 7 && m.to.c === 0) this.castling.wQ = false;
+                if (m.to.r === 7 && m.to.c === 7) this.castling.wK = false;
+                if (m.to.r === 0 && m.to.c === 0) this.castling.bQ = false;
+                if (m.to.r === 0 && m.to.c === 7) this.castling.bK = false;
+
+                this.enPassant = m.isDoublePawn ? { r: (m.from.r + m.to.r) / 2, c: m.from.c } : null;
+
+                if (p.type === 'p' || undo.captured) this.halfMoveClock = 0;
+                else this.halfMoveClock++;
+
+                if (this.turn === 'b') this.fullMoveNumber++;
+                this.turn = this.turn === 'w' ? 'b' : 'w';
+                return undo;
+            }
+
+            unmakeFast(m, undo) {
+                this.turn = this.turn === 'w' ? 'b' : 'w';
+                this.castling = undo.castling;
+                this.enPassant = undo.enPassant;
+                this.halfMoveClock = undo.halfMoveClock;
+                this.fullMoveNumber = undo.fullMoveNumber;
+
+                this.board[m.from.r][m.from.c] = undo.moved;
+                if (m.isEnPassant) {
+                    this.board[m.to.r][m.to.c] = null;
+                    this.board[undo.epPos.r][undo.epPos.c] = undo.captured;
+                } else {
+                    this.board[m.to.r][m.to.c] = undo.captured;
+                }
+                if (m.isCastle === 'K') {
+                    this.board[m.from.r][7] = this.board[m.from.r][5];
+                    this.board[m.from.r][5] = null;
+                } else if (m.isCastle === 'Q') {
+                    this.board[m.from.r][0] = this.board[m.from.r][3];
+                    this.board[m.from.r][3] = null;
+                }
+            }
+
+            legalMoves(color = this.turn, onlyCaptures = false) {
+                const ps = this.pseudoMoves(color, onlyCaptures);
+                const out = [];
+                for (const m of ps) {
+                    const u = this.applyFast(m);
+                    if (!this.isInCheck(color)) out.push(m);
+                    this.unmakeFast(m, u);
+                }
+                return out;
+            }
+
+            toSAN(m, legalList) {
+                if (m.isCastle === 'K') return 'O-O';
+                if (m.isCastle === 'Q') return 'O-O-O';
+                const files = 'abcdefgh';
+                const ranks = '87654321';
+                const letters = { n: 'N', b: 'B', r: 'R', q: 'Q', k: 'K' };
+                let s = '';
+                if (m.piece.type !== 'p') {
+                    s += letters[m.piece.type];
+                    const amb = legalList.filter(x =>
+                        x.piece.type === m.piece.type && x.to.r === m.to.r && x.to.c === m.to.c &&
+                        (x.from.r !== m.from.r || x.from.c !== m.from.c)
+                    );
+                    if (amb.length > 0) {
+                        const sameF = amb.some(x => x.from.c === m.from.c);
+                        const sameR = amb.some(x => x.from.r === m.from.r);
+                        if (!sameF) s += files[m.from.c];
+                        else if (!sameR) s += ranks[m.from.r];
+                        else s += files[m.from.c] + ranks[m.from.r];
+                    }
+                } else if (m.captured || m.isEnPassant) {
+                    s += files[m.from.c];
+                }
+                if (m.captured || m.isEnPassant) s += 'x';
+                s += files[m.to.c] + ranks[m.to.r];
+                if (m.promotion) s += '=' + letters[m.promotion];
+                return s;
+            }
+
+            commitMove(m) {
+                const leg = this.legalMoves(this.turn);
+                let san = this.toSAN(m, leg);
+                const snap = this.cloneState();
+                this.applyFast(m);
+                this.recordPos();
+
+                const nextLeg = this.legalMoves(this.turn);
+                const chk = this.isInCheck(this.turn);
+                if (nextLeg.length === 0 && chk) san += '#';
+                else if (chk) san += '+';
+
+                const rec = {
+                    move: m,
+                    san,
+                    snapshot: snap,
+                    color: snap.turn,
+                    captured: m.captured || null,
+                    analysis: null
+                };
+                this.history.push(rec);
+                return rec;
+            }
+
+            status() {
+                const leg = this.legalMoves(this.turn);
+                const chk = this.isInCheck(this.turn);
+                if (leg.length === 0) {
+                    if (chk) return { over: true, winner: this.turn === 'w' ? 'b' : 'w', reason: 'Мат на доске!' };
+                    return { over: true, winner: 'draw', reason: 'Пат — ничья!' };
+                }
+                if (this.halfMoveClock >= 100) return { over: true, winner: 'draw', reason: 'Ничья по правилу 50 ходов' };
+                if ((this.posCounts.get(this.posKey()) || 0) >= 3) return { over: true, winner: 'draw', reason: 'Ничья — троекратное повторение' };
+                return { over: false, inCheck: chk };
+            }
+        }
+
+        /* =====================================================================
+           5. ПОИСК И ОЦЕНКА ИИ (0 — 6000 ELO + АНАЛИЗ ХОДОВ)
+           ===================================================================== */
+        const PST_PAWN = [
+            [0,0,0,0,0,0,0,0],
+            [50,50,50,50,50,50,50,50],
+            [10,10,20,30,30,20,10,10],
+            [5,5,10,25,25,10,5,5],
+            [0,0,0,20,20,0,0,0],
+            [5,-5,-10,0,0,-10,-5,5],
+            [5,10,10,-20,-20,10,10,5],
+            [0,0,0,0,0,0,0,0]
+        ];
+
+        const PST_MINOR = [
+            [-40,-30,-20,-20,-20,-20,-30,-40],
+            [-30,-10,0,0,0,0,-10,-30],
+            [-20,0,10,15,15,10,0,-20],
+            [-20,5,15,20,20,15,5,-20],
+            [-20,0,15,20,20,15,0,-20],
+            [-20,5,10,15,15,10,5,-20],
+            [-30,-10,0,5,5,0,-10,-30],
+            [-40,-30,-20,-20,-20,-20,-30,-40]
+        ];
+
+        const BOOK_STARTS = [
+            { from: { r: 6, c: 4 }, to: { r: 4, c: 4 } }, // e4
+            { from: { r: 6, c: 3 }, to: { r: 4, c: 3 } }, // d4
+            { from: { r: 6, c: 2 }, to: { r: 4, c: 2 } }, // c4
+            { from: { r: 7, c: 6 }, to: { r: 5, c: 5 } }  // Nf3
+        ];
+
+        class ChessEngineAI {
+            constructor() {
+                this.tt = new Map();
+                this.deadline = 0;
+                this.timedOut = false;
+                this.nodes = 0;
+            }
+
+            evalWhite(eng, detailed = true) {
+                let s = 0;
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const p = eng.board[r][c];
+                        if (!p) continue;
+                        const sign = p.color === 'w' ? 1 : -1;
+                        let v = VAL[p.type];
+                        if (detailed) {
+                            const rr = p.color === 'w' ? r : 7 - r;
+                            if (p.type === 'p') v += PST_PAWN[rr][c];
+                            else if (p.type === 'n' || p.type === 'b') v += PST_MINOR[rr][c];
+                            else if (p.type === 'k') {
+                                // Бережём короля в дебюте/миттельшпиле
+                                v += (rr >= 6 ? 18 : -18) - Math.abs(c - 3.5) * 4;
+                            }
+                        }
+                        s += sign * v;
+                    }
+                }
+                return s;
+            }
+
+            order(moves, hint = null) {
+                return moves.sort((a, b) => {
+                    if (hint && a.from.r === hint.from.r && a.from.c === hint.from.c && a.to.r === hint.to.r && a.to.c === hint.to.c) return -100000;
+                    if (hint && b.from.r === hint.from.r && b.from.c === hint.from.c && b.to.r === hint.to.r && b.to.c === hint.to.c) return 100000;
+                    const sa = (a.captured ? VAL[a.captured.type] * 10 - VAL[a.piece.type] : 0) + (a.promotion ? 800 : 0);
+                    const sb = (b.captured ? VAL[b.captured.type] * 10 - VAL[b.piece.type] : 0) + (b.promotion ? 800 : 0);
+                    return sb - sa;
+                });
+            }
+
+            quiescence(eng, alpha, beta, colorSign, detailed) {
+                this.nodes++;
+                if ((this.nodes & 255) === 0 && performance.now() > this.deadline) {
+                    this.timedOut = true;
+                    return colorSign * this.evalWhite(eng, detailed);
+                }
+                const standPat = colorSign * this.evalWhite(eng, detailed);
+                if (standPat >= beta) return beta;
+                if (alpha < standPat) alpha = standPat;
+
+                const caps = this.order(eng.legalMoves(eng.turn, true));
+                for (const m of caps) {
+                    const u = eng.applyFast(m);
+                    const score = -this.quiescence(eng, -beta, -alpha, -colorSign, detailed);
+                    eng.unmakeFast(m, u);
+                    if (this.timedOut) return alpha;
+                    if (score >= beta) return beta;
+                    if (score > alpha) alpha = score;
+                }
+                return alpha;
+            }
+
+            negamax(eng, depth, alpha, beta, colorSign, useQ, detailed) {
+                this.nodes++;
+                if ((this.nodes & 255) === 0 && performance.now() > this.deadline) {
+                    this.timedOut = true;
+                    return colorSign * this.evalWhite(eng, detailed);
+                }
+
+                const key = eng.posKey() + '|' + depth;
+                const cached = this.tt.get(key);
+                if (cached && cached.depth >= depth) {
+                    return cached.score;
+                }
+
+                const leg = eng.legalMoves(eng.turn);
+                if (leg.length === 0) {
+                    if (eng.isInCheck(eng.turn)) return -90000 - depth * 100;
+                    return 0;
+                }
+
+                if (depth <= 0) {
+                    return useQ ? this.quiescence(eng, alpha, beta, colorSign, detailed) : colorSign * this.evalWhite(eng, detailed);
+                }
+
+                let best = -Infinity;
+                const ordered = this.order(leg);
+                for (const m of ordered) {
+                    const u = eng.applyFast(m);
+                    const sc = -this.negamax(eng, depth - 1, -beta, -alpha, -colorSign, useQ, detailed);
+                    eng.unmakeFast(m, u);
+                    if (this.timedOut) return best > -Infinity ? best : alpha;
+                    if (sc > best) best = sc;
+                    if (sc > alpha) alpha = sc;
+                    if (alpha >= beta) break;
+                }
+
+                if (this.tt.size < 25000) {
+                    this.tt.set(key, { depth, score: best });
+                }
+                return best;
+            }
+
+            pickMove(eng, elo) {
+                const leg = eng.legalMoves(eng.turn);
+                if (leg.length === 0) return null;
+                if (leg.length === 1) return { move: leg[0], evalWhite: this.evalWhite(eng, true) };
+
+                const sign = eng.turn === 'w' ? 1 : -1;
+
+                if (elo <= 300) {
+                    const m = leg[Math.floor(Math.random() * leg.length)];
+                    return { move: m, evalWhite: this.evalWhite(eng, false) };
+                }
+
+                if (elo <= 800) {
+                    const noise = Math.max(80, 450 - (elo - 300) * 0.7);
+                    let bestM = leg[0], bestV = -Infinity;
+                    for (const m of leg) {
+                        const u = eng.applyFast(m);
+                        const v = sign * this.evalWhite(eng, false) + (Math.random() - 0.5) * noise;
+                        eng.unmakeFast(m, u);
+                        if (v > bestV) { bestV = v; bestM = m; }
+                    }
+                    return { move: bestM, evalWhite: this.evalWhite(eng, true) };
+                }
+
+                // Дебютная книга для сильных ботов (2400+ ELO) на 1-м ходе
+                if (elo >= 2400 && eng.history.length === 0) {
+                    const b = BOOK_STARTS[Math.floor(Math.random() * BOOK_STARTS.length)];
+                    const found = leg.find(x => x.from.r === b.from.r && x.from.c === b.from.c && x.to.r === b.to.r && x.to.c === b.to.c);
+                    if (found) return { move: found, evalWhite: 25 };
+                }
+
+                let maxD = 2;
+                let budgetMs = 450;
+                let useQ = false;
+                let noise = 0;
+
+                if (elo <= 1300) { maxD = 2; budgetMs = 380; noise = 45; }
+                else if (elo <= 1800) { maxD = 2; budgetMs = 520; noise = 10; }
+                else if (elo <= 2400) { maxD = 3; budgetMs = 700; useQ = false; }
+                else if (elo <= 3200) { maxD = 3; budgetMs = 850; useQ = true; }
+                else if (elo <= 4500) { maxD = 4; budgetMs = 1100; useQ = true; }
+                else { maxD = 4; budgetMs = 1350; useQ = true; }
+
+                this.deadline = performance.now() + budgetMs;
+                this.timedOut = false;
+                this.nodes = 0;
+
+                let bestOverall = this.order([...leg])[0];
+                let scoreOverall = 0;
+
+                for (let d = 1; d <= maxD; d++) {
+                    let iterBest = bestOverall;
+                    let iterScore = -Infinity;
+                    let alpha = -Infinity;
+                    const ordered = this.order([...leg], bestOverall);
+
+                    for (const m of ordered) {
+                        const u = eng.applyFast(m);
+                        const sc = -this.negamax(eng, d - 1, -Infinity, -alpha, -sign, useQ, true) + (noise ? (Math.random() - 0.5) * noise : 0);
+                        eng.unmakeFast(m, u);
+                        if (this.timedOut) break;
+                        if (sc > iterScore) { iterScore = sc; iterBest = m; }
+                        if (sc > alpha) alpha = sc;
+                    }
+
+                    if (!this.timedOut && iterScore > -Infinity) {
+                        bestOverall = iterBest;
+                        scoreOverall = iterScore;
+                    }
+                    if (this.timedOut || Math.abs(scoreOverall) > 80000) break;
+                }
+
+                return { move: bestOverall, evalWhite: scoreOverall * sign };
+            }
+
+            quickAnalyzeMove(snap) {
+                const temp = new ChessGame();
+                temp.restoreState(snap);
+                const sign = temp.turn === 'w' ? 1 : -1;
+                const legal = this.order(temp.legalMoves(temp.turn));
+                if (!legal.length) return null;
+
+                let bestMove = legal[0];
+                let bestScore = -Infinity;
+                for (const move of legal) {
+                    const undo = temp.applyFast(move);
+                    const score = sign * this.evalWhite(temp, true) +
+                        (move.promotion ? VAL[move.promotion] * 0.65 : 0);
+                    temp.unmakeFast(move, undo);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMove = move;
+                    }
+                }
+                return { bestMove, provisional: true };
+            }
+
+            analyzeMove(snap, playedMove, plyIdx, prevAnalysis) {
+                const temp = new ChessGame();
+                temp.restoreState(snap);
+                const color = temp.turn;
+                const enemy = color === 'w' ? 'b' : 'w';
+                const sign = color === 'w' ? 1 : -1;
+                const leg = temp.legalMoves(color);
+                if (leg.length === 0) return null;
+
+                // Проверка книжного хода на самом первом ходе
+                if (plyIdx === 0 && BOOK_STARTS.some(b =>
+                    b.from.r === playedMove.from.r && b.from.c === playedMove.from.c &&
+                    b.to.r === playedMove.to.r && b.to.c === playedMove.to.c
+                )) {
+                    return {
+                        cls: CLS_META.book,
+                        bestMove: playedMove,
+                        bestSan: temp.toSAN(playedMove, leg),
+                        evalAfter: 25 * sign,
+                        cpLoss: 0,
+                        accuracy: 100,
+                        explanation: 'Классический дебютный ход из теории.'
+                    };
+                }
+
+                this.deadline = performance.now() + 300;
+                this.timedOut = false;
+                this.nodes = 0;
+
+                const scored = [];
+                for (const m of this.order([...leg])) {
+                    const u = temp.applyFast(m);
+                    const sc = -this.negamax(temp, 1, -Infinity, Infinity, -sign, false, true);
+                    temp.unmakeFast(m, u);
+                    scored.push({ move: m, sc });
+                }
+                scored.sort((a, b) => b.sc - a.sc);
+
+                const bestEntry = scored[0];
+                const secondEntry = scored.length > 1 ? scored[1] : null;
+                const playedEntry = scored.find(x =>
+                    x.move.from.r === playedMove.from.r && x.move.from.c === playedMove.from.c &&
+                    x.move.to.r === playedMove.to.r && x.move.to.c === playedMove.to.c &&
+                    (x.move.promotion || null) === (playedMove.promotion || null)
+                ) || bestEntry;
+
+                const cpLoss = Math.max(0, bestEntry.sc - playedEntry.sc);
+                const bestSan = temp.toSAN(bestEntry.move, leg);
+                const evalAfterWhite = playedEntry.sc * sign;
+
+                // Проверка жертвы для Блестящего хода (!!)
+                const uP = temp.applyFast(playedMove);
+                const attacked = temp.isAttacked(playedMove.to.r, playedMove.to.c, enemy);
+                temp.unmakeFast(playedMove, uP);
+                const isSac = attacked && VAL[playedMove.piece.type] >= 320 && (!playedMove.captured || VAL[playedMove.piece.type] > VAL[playedMove.captured.type] + 80);
+
+                const oppMistake = prevAnalysis && (prevAnalysis.cls.key === 'blunder' || prevAnalysis.cls.key === 'mistake');
+
+                let cls = CLS_META.good;
+                let explanation = `Надёжный ход. Альтернатива: ${bestSan}.`;
+
+                if (cpLoss <= 20 && isSac && playedEntry.sc >= -60) {
+                    cls = CLS_META.brilliant;
+                    explanation = `Блестящий ход! Эффектная жертва фигурой создаёт острую атаку.`;
+                } else if (cpLoss <= 20 && secondEntry && (bestEntry.sc - secondEntry.sc) >= 150 && playedEntry.sc >= -80) {
+                    cls = CLS_META.great;
+                    explanation = `Замечательный ход — единственный сильный в этой позиции.`;
+                } else if (cpLoss <= 15) {
+                    cls = CLS_META.best;
+                    explanation = `Лучший ход по оценке движка.`;
+                } else if (cpLoss <= 45) {
+                    cls = CLS_META.excellent;
+                    explanation = `Прекрасный ход, почти не уступающий ${bestSan}.`;
+                } else if (cpLoss <= 85) {
+                    cls = CLS_META.good;
+                    explanation = `Хороший ход. Сильнее было ${bestSan}.`;
+                } else if (oppMistake && bestEntry.sc >= 220 && playedEntry.sc < 100) {
+                    cls = CLS_META.miss;
+                    explanation = `Упущенный шанс! Ход ${bestSan} давал большой перевес.`;
+                } else if (cpLoss <= 155) {
+                    cls = CLS_META.inaccuracy;
+                    explanation = `Неточность: упущена часть инициативы. Лучше: ${bestSan}.`;
+                } else if (cpLoss <= 300) {
+                    cls = CLS_META.mistake;
+                    explanation = `Ошибка: позиция ухудшилась. Стоило сыграть ${bestSan}.`;
+                } else {
+                    cls = CLS_META.blunder;
+                    explanation = `Зевок! Грубая потеря оценки. Лучший ход: ${bestSan}.`;
+                }
+
+                const accuracy = Math.max(0, Math.min(100, 103.17 * Math.exp(-0.00435 * cpLoss) - 3.17));
+
+                return {
+                    cls,
+                    bestMove: bestEntry.move,
+                    bestSan,
+                    evalAfter: evalAfterWhite,
+                    cpLoss,
+                    accuracy,
+                    explanation
+                };
+            }
+        }
+
+        /* =====================================================================
+           6. СОСТОЯНИЕ ИНТЕРФЕЙСА, АНИМАЦИИ, DRAG & DROP И СОБЫТИЯ
+           ===================================================================== */
+        const game = new ChessGame();
+        const ai = new ChessEngineAI();
+
+        let mode = 'bot'; // 'bot' | 'analysis'
+        let elo = 1200;
+        let colorPref = 'w'; // 'w' | 'b' | 'random'
+        let humanSide = 'w';
+        let flipped = false;
+        let selected = null;
+        let selectedMoves = [];
+        let hint = null;
+        let botThinking = false;
+        let isOver = false;
+        let viewIdx = -1;
+        let pendingPromo = null;
+
+        let dragActive = false;
+        let dragFrom = null;
+        let dragStart = { x: 0, y: 0 };
+
+        const TIME_CONTROL_PRESETS = {
+            infinite: { id: 'infinite', label: '∞ Без времени', baseMs: 0, incrementMs: 0 },
+            bullet1: { id: 'bullet1', label: 'Bullet 1+0', baseMs: 60_000, incrementMs: 0 },
+            bullet2: { id: 'bullet2', label: 'Bullet 2+1', baseMs: 120_000, incrementMs: 1_000 },
+            blitz3: { id: 'blitz3', label: 'Blitz 3+0', baseMs: 180_000, incrementMs: 0 },
+            blitz3i2: { id: 'blitz3i2', label: 'Blitz 3+2', baseMs: 180_000, incrementMs: 2_000 },
+            blitz5: { id: 'blitz5', label: 'Blitz 5+0', baseMs: 300_000, incrementMs: 0 },
+            rapid10: { id: 'rapid10', label: 'Rapid 10+0', baseMs: 600_000, incrementMs: 0 },
+            rapid15i10: { id: 'rapid15i10', label: 'Rapid 15+10', baseMs: 900_000, incrementMs: 10_000 },
+            rapid30: { id: 'rapid30', label: 'Rapid 30+0', baseMs: 1_800_000, incrementMs: 0 }
+        };
+        let selectedTimeControl = TIME_CONTROL_PRESETS.infinite;
+        let activeTimeControl = TIME_CONTROL_PRESETS.infinite;
+        let clockRemaining = { w: Infinity, b: Infinity };
+        let clockStarted = false;
+        let clockRunningSide = null;
+        let clockLastTick = 0;
+        let clockIntervalId = null;
+
+        function $(id) {
+            return document.getElementById(id);
+        }
+
+        function toast(msg) {
+            const el = $('toast');
+            if (!el) return;
+            el.textContent = msg;
+            el.classList.add('show');
+            clearTimeout(toast._t);
+            toast._t = setTimeout(() => el.classList.remove('show'), 2100);
+        }
+
+        function readSelectedTimeControl() {
+            const id = $('timeControlSelect') ? $('timeControlSelect').value : 'infinite';
+            if (id === 'custom') {
+                const rawMinutes = Number($('customMinutes').value);
+                const rawIncrement = Number($('customIncrement').value);
+                const minutes = Math.max(0.5, Math.min(180, Number.isFinite(rawMinutes) ? rawMinutes : 5));
+                const increment = Math.max(0, Math.min(60, Number.isFinite(rawIncrement) ? rawIncrement : 0));
+                return {
+                    id: 'custom',
+                    label: `Своё ${minutes} мин + ${increment} сек`,
+                    baseMs: minutes * 60_000,
+                    incrementMs: increment * 1_000
+                };
+            }
+            return TIME_CONTROL_PRESETS[id] || TIME_CONTROL_PRESETS.infinite;
+        }
+
+        function clockIsEnabled() {
+            return mode === 'bot' && activeTimeControl.id !== 'infinite' && activeTimeControl.baseMs > 0;
+        }
+
+        function formatClock(ms) {
+            if (!Number.isFinite(ms)) return '∞';
+            const safeMs = Math.max(0, ms);
+            if (safeMs < 10_000 && safeMs > 0) {
+                return `0:${(safeMs / 1_000).toFixed(1).padStart(4, '0')}`;
+            }
+            const totalSeconds = Math.ceil(safeMs / 1_000);
+            const seconds = String(totalSeconds % 60).padStart(2, '0');
+            const totalMinutes = Math.floor(totalSeconds / 60);
+            if (totalMinutes >= 60) {
+                return `${Math.floor(totalMinutes / 60)}:${String(totalMinutes % 60).padStart(2, '0')}:${seconds}`;
+            }
+            return `${totalMinutes}:${seconds}`;
+        }
+
+        function updateClockUI() {
+            const enabled = clockIsEnabled();
+            const top = $('topClock');
+            const bottom = $('bottomClock');
+            const topColor = flipped ? 'w' : 'b';
+            const bottomColor = flipped ? 'b' : 'w';
+
+            if (top) {
+                top.textContent = enabled ? formatClock(clockRemaining[topColor]) : '∞';
+                top.classList.toggle('hidden', mode !== 'bot');
+                top.classList.toggle('active-clock', enabled && clockStarted && clockRunningSide === topColor);
+                top.classList.toggle('low-time', enabled && clockRemaining[topColor] <= 10_000);
+            }
+            if (bottom) {
+                bottom.textContent = enabled ? formatClock(clockRemaining[bottomColor]) : '∞';
+                bottom.classList.toggle('hidden', mode !== 'bot');
+                bottom.classList.toggle('active-clock', enabled && clockStarted && clockRunningSide === bottomColor);
+                bottom.classList.toggle('low-time', enabled && clockRemaining[bottomColor] <= 10_000);
+            }
+
+            const summary = $('timeControlSummary');
+            const headerLabel = $('timeControlLabel');
+            if (summary) summary.textContent = selectedTimeControl.label;
+            if (headerLabel) {
+                const shownControl = game.history.length ? activeTimeControl : selectedTimeControl;
+                headerLabel.textContent = shownControl.label;
+            }
+        }
+
+        function resetClockState() {
+            const start = clockIsEnabled() ? activeTimeControl.baseMs : Infinity;
+            clockRemaining = { w: start, b: start };
+            clockStarted = false;
+            clockRunningSide = null;
+            clockLastTick = 0;
+            updateClockUI();
+        }
+
+        function tickClock() {
+            if (!clockIsEnabled() || !clockStarted || !clockRunningSide || isOver) return;
+            const now = performance.now();
+            const side = clockRunningSide;
+            clockRemaining[side] = Math.max(0, clockRemaining[side] - Math.max(0, now - clockLastTick));
+            clockLastTick = now;
+            if (clockRemaining[side] <= 0) {
+                clockRemaining[side] = 0;
+                clockRunningSide = null;
+                updateClockUI();
+                endGame({
+                    over: true,
+                    winner: side === 'w' ? 'b' : 'w',
+                    reason: 'Время вышло'
+                });
+                return;
+            }
+            updateClockUI();
+        }
+
+        function canMoveBeforeFlag(side) {
+            if (!clockIsEnabled() || !clockStarted) return true;
+            if (clockRunningSide !== side) return false;
+            tickClock();
+            return !isOver && clockRemaining[side] > 0;
+        }
+
+        function captureClockState() {
+            return {
+                remaining: { ...clockRemaining },
+                started: clockStarted,
+                side: clockRunningSide
+            };
+        }
+
+        function restoreClockState(state) {
+            if (!state) {
+                resetClockState();
+                return;
+            }
+            clockRemaining = { ...state.remaining };
+            clockStarted = state.started;
+            clockRunningSide = state.side;
+            clockLastTick = clockStarted && clockRunningSide ? performance.now() : 0;
+            updateClockUI();
+        }
+
+        function advanceClockAfterMove(mover, nextSide) {
+            if (!clockIsEnabled()) {
+                updateClockUI();
+                return true;
+            }
+            if (clockStarted) {
+                tickClock();
+                if (isOver || clockRemaining[mover] <= 0) return false;
+            } else {
+                clockStarted = true;
+            }
+            clockRemaining[mover] += activeTimeControl.incrementMs;
+            clockRunningSide = nextSide;
+            clockLastTick = performance.now();
+            updateClockUI();
+            return true;
+        }
+
+        function applySelectedTimeControl() {
+            selectedTimeControl = readSelectedTimeControl();
+            const custom = $('timeControlSelect').value === 'custom';
+            $('customTimeFields').classList.toggle('hidden', !custom);
+            updateClockUI();
+
+            if (!game.history.length && !isOver) {
+                activeTimeControl = selectedTimeControl;
+                resetClockState();
+            } else {
+                toast('Контроль времени применится в следующей партии');
+            }
+        }
+
+        function updateBotUI() {
+            const prof = getBotProfile(elo);
+            $('botProfileIcon').textContent = prof.icon;
+            $('botProfileName').textContent = prof.name;
+            $('botProfileDesc').textContent = prof.desc;
+            $('eloSlider').value = String(elo);
+            $('eloNumberInput').value = String(elo);
+
+            if (mode === 'bot') {
+                $('topAvatar').textContent = '🤖';
+                $('topName').textContent = prof.name;
+                $('topBadge').textContent = `${elo} ELO`;
+                $('bottomAvatar').textContent = '👤';
+                $('bottomName').textContent = 'Вы';
+            }
+        }
+
+        function setElo(val) {
+            const num = parseInt(val, 10);
+            elo = Number.isNaN(num) ? 1200 : Math.max(0, Math.min(6000, num));
+            updateBotUI();
+        }
+
+        function setTheme(name) {
+            document.body.classList.remove('theme-wood', 'theme-ocean');
+            if (name === 'wood') document.body.classList.add('theme-wood');
+            if (name === 'ocean') document.body.classList.add('theme-ocean');
+            ['classic', 'wood', 'ocean'].forEach(t => {
+                const btn = $('theme' + t[0].toUpperCase() + t.slice(1) + 'Btn');
+                if (btn) btn.classList.toggle('active', t === name);
+            });
+            renderBoard();
+            renderArrow();
+        }
+
+        function setMode(newMode) {
+            if (botThinking) return;
+            mode = newMode;
+            $('modeBotBtn').classList.toggle('active', mode === 'bot');
+            $('modeAnalysisBtn').classList.toggle('active', mode === 'analysis');
+            $('modeBotBtn').setAttribute('aria-pressed', String(mode === 'bot'));
+            $('modeAnalysisBtn').setAttribute('aria-pressed', String(mode === 'analysis'));
+            $('botSettingsCard').classList.toggle('hidden', mode !== 'bot');
+            $('analysisModeCard').classList.toggle('hidden', mode !== 'analysis');
+            $('resignBtn').classList.toggle('hidden', mode !== 'bot');
+
+            if (mode === 'analysis') {
+                $('topAvatar').textContent = '♚';
+                $('topName').textContent = 'Чёрные (Анализ)';
+                $('topBadge').textContent = 'Анализ';
+                $('bottomAvatar').textContent = '♔';
+                $('bottomName').textContent = 'Белые (Анализ)';
+            } else {
+                updateBotUI();
+            }
+            newGame();
+        }
+
+        function switchTab(tab) {
+            const isSetup = tab === 'setup';
+            $('tabSetupBtn').classList.toggle('active', isSetup);
+            $('tabReviewBtn').classList.toggle('active', !isSetup);
+            $('setupPanel').classList.toggle('hidden', !isSetup);
+            $('reviewPanel').classList.toggle('hidden', isSetup);
+        }
+
+        function buildReviewTableEmpty() {
+            const box = $('classificationRows');
+            if (!box) return;
+            box.innerHTML = CLS_LIST.map(k => {
+                const c = CLS_META[k];
+                return `
+                    <div class="cls-row">
+                        <div class="mono" style="text-align:center;font-weight:800;color:#94a3b8;" id="cw-${k}">0</div>
+                        <div class="cls-center" title="${c.desc}">
+                            <span class="cls-dot-badge" style="background:${c.color};">${c.symbol}</span>
+                            <span>${c.name}</span>
+                        </div>
+                        <div class="mono" style="text-align:center;font-weight:800;color:#94a3b8;" id="cb-${k}">0</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function refreshReviewStats() {
+            const cw = {}, cb = {};
+            CLS_LIST.forEach(k => { cw[k] = 0; cb[k] = 0; });
+            let sumW = 0, nW = 0, sumB = 0, nB = 0;
+
+            for (const rec of game.history) {
+                if (!rec.analysis) continue;
+                const k = rec.analysis.cls.key;
+                if (rec.color === 'w') {
+                    cw[k]++;
+                    sumW += rec.analysis.accuracy;
+                    nW++;
+                } else {
+                    cb[k]++;
+                    sumB += rec.analysis.accuracy;
+                    nB++;
+                }
+            }
+
+            CLS_LIST.forEach(k => {
+                const ew = $('cw-' + k), eb = $('cb-' + k);
+                if (ew) { ew.textContent = String(cw[k]); ew.style.color = cw[k] ? CLS_META[k].color : '#64748b'; }
+                if (eb) { eb.textContent = String(cb[k]); eb.style.color = cb[k] ? CLS_META[k].color : '#64748b'; }
+            });
+
+            const wStr = nW ? (sumW / nW).toFixed(1) + '%' : '—%';
+            const bStr = nB ? (sumB / nB).toFixed(1) + '%' : '—%';
+            $('whiteAccVal').textContent = wStr;
+            $('blackAccVal').textContent = bStr;
+
+            if (nW || nB) {
+                $('topAccuracy').classList.remove('hidden');
+                $('bottomAccuracy').classList.remove('hidden');
+                $('topAccuracy').textContent = `Точность: ${flipped ? wStr : bStr}`;
+                $('bottomAccuracy').textContent = `Точность: ${flipped ? bStr : wStr}`;
+            } else {
+                $('topAccuracy').classList.add('hidden');
+                $('bottomAccuracy').classList.add('hidden');
+            }
+        }
+
+        function getViewEngine() {
+            if (viewIdx === game.history.length - 1) return game;
+            const tmp = new ChessGame();
+            if (viewIdx < 0) return tmp;
+            if (viewIdx + 1 < game.history.length) {
+                tmp.restoreState(game.history[viewIdx + 1].snapshot);
+            }
+            return tmp;
+        }
+
+        function slidePiece(from, to) {
+            requestAnimationFrame(() => {
+                const targetSq = document.querySelector(`.square[data-r="${to.r}"][data-c="${to.c}"]`);
+                const wrap = targetSq ? targetSq.querySelector('.piece-wrap') : null;
+                if (!targetSq || !wrap) return;
+                const size = targetSq.getBoundingClientRect().width;
+                if (!size) return;
+
+                const vrFrom = flipped ? 7 - from.r : from.r;
+                const vcFrom = flipped ? 7 - from.c : from.c;
+                const vrTo = flipped ? 7 - to.r : to.r;
+                const vcTo = flipped ? 7 - to.c : to.c;
+
+                const dx = (vcFrom - vcTo) * size;
+                const dy = (vrFrom - vrTo) * size;
+                const distance = Math.hypot(to.r - from.r, to.c - from.c);
+                const reducedMotion = window.matchMedia &&
+                    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                const duration = reducedMotion ? 1 : Math.min(520, 280 + distance * 25);
+
+                wrap.style.transition = 'none';
+                wrap.style.transform = `translate3d(${dx}px, ${dy}px, 0) scale(0.96)`;
+                wrap.style.zIndex = '30';
+                void wrap.offsetWidth;
+                wrap.style.transition = `transform ${duration}ms cubic-bezier(0.2, 0.75, 0.25, 1)`;
+                wrap.style.transform = 'translate3d(0, 0, 0) scale(1)';
+                setTimeout(() => {
+                    if (!wrap.isConnected) return;
+                    wrap.style.zIndex = '10';
+                    wrap.style.transition = '';
+                    wrap.style.transform = '';
+                }, duration + 30);
+            });
+        }
+
+        function renderBoard(animMove = null) {
+            const grid = $('chessGrid');
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            const eng = getViewEngine();
+            const isLatest = viewIdx === game.history.length - 1;
+            const activeRec = viewIdx >= 0 ? game.history[viewIdx] : null;
+            const lastM = activeRec ? activeRec.move : null;
+
+            const chkColor = eng.isInCheck(eng.turn) ? eng.turn : null;
+            const chkKing = chkColor ? eng.findKing(chkColor) : null;
+
+            const files = 'abcdefgh';
+            const ranks = '87654321';
+
+            for (let vr = 0; vr < 8; vr++) {
+                for (let vc = 0; vc < 8; vc++) {
+                    const r = flipped ? 7 - vr : vr;
+                    const c = flipped ? 7 - vc : vc;
+
+                    const sq = document.createElement('div');
+                    sq.className = `square ${((r + c) % 2 === 0) ? 'light' : 'dark'}`;
+                    sq.dataset.r = String(r);
+                    sq.dataset.c = String(c);
+
+                    if (lastM && ((lastM.from.r === r && lastM.from.c === c) || (lastM.to.r === r && lastM.to.c === c))) {
+                        sq.classList.add('last-move');
+                    }
+                    if (isLatest && selected && selected.r === r && selected.c === c) {
+                        sq.classList.add('selected');
+                    }
+                    if (isLatest && hint && ((hint.from.r === r && hint.from.c === c) || (hint.to.r === r && hint.to.c === c))) {
+                        sq.classList.add('hint-sq');
+                    }
+                    if (chkKing && chkKing.r === r && chkKing.c === c) {
+                        sq.classList.add('in-check');
+                    }
+
+                    if (vc === 0) {
+                        const rl = document.createElement('span');
+                        rl.className = 'coord rank';
+                        rl.textContent = ranks[r];
+                        sq.appendChild(rl);
+                    }
+                    if (vr === 7) {
+                        const fl = document.createElement('span');
+                        fl.className = 'coord file';
+                        fl.textContent = files[c];
+                        sq.appendChild(fl);
+                    }
+
+                    if (isLatest) {
+                        const hit = selectedMoves.find(m => m.to.r === r && m.to.c === c);
+                        if (hit) {
+                            const ind = document.createElement('div');
+                            ind.className = (eng.board[r][c] || hit.isEnPassant) ? 'capture-ring' : 'move-dot';
+                            sq.appendChild(ind);
+                        }
+                    }
+
+                    const piece = eng.board[r][c];
+                    if (piece) {
+                        const key = piece.color + piece.type.toUpperCase();
+                        const wrap = document.createElement('div');
+                        wrap.className = 'piece-wrap';
+                        wrap.innerHTML = PIECE_SVG[key] || '';
+
+                        const interactive = isLatest && !isOver && !botThinking &&
+                            (mode === 'analysis' ? piece.color === game.turn : (piece.color === humanSide && game.turn === humanSide));
+
+                        if (interactive) {
+                            wrap.addEventListener('pointerdown', (ev) => {
+                                if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+                                ev.stopPropagation();
+                                pickSquare(r, c);
+                                dragActive = true;
+                                dragFrom = { r, c };
+                                dragStart = { x: ev.clientX, y: ev.clientY };
+
+                                const rect = wrap.getBoundingClientRect();
+                                const ghost = $('dragGhost');
+                                ghost.innerHTML = PIECE_SVG[key] || '';
+                                ghost.style.width = rect.width + 'px';
+                                ghost.style.height = rect.height + 'px';
+                                ghost.style.left = ev.clientX + 'px';
+                                ghost.style.top = ev.clientY + 'px';
+                                ghost.classList.remove('hidden');
+                                wrap.classList.add('dragging-hidden');
+                            });
+                        }
+                        sq.appendChild(wrap);
+                    }
+
+                    if (activeRec && activeRec.analysis && lastM && lastM.to.r === r && lastM.to.c === c) {
+                        const badge = document.createElement('div');
+                        badge.className = 'cell-badge';
+                        badge.style.background = activeRec.analysis.cls.color;
+                        badge.textContent = activeRec.analysis.cls.symbol;
+                        badge.title = `${activeRec.analysis.cls.name}: ${activeRec.analysis.explanation}`;
+                        sq.appendChild(badge);
+                    }
+
+                    sq.addEventListener('click', () => onSquareClick(r, c));
+                    grid.appendChild(sq);
+                }
+            }
+
+            if (animMove) {
+                slidePiece(animMove.from, animMove.to);
+            }
+        }
+
+        function renderArrow() {
+            const svg = $('arrowSvg');
+            if (!svg) return;
+            svg.innerHTML = '';
+
+            const activeRec = viewIdx >= 0 ? game.history[viewIdx] : null;
+            const activeAnalysis = activeRec && (activeRec.analysis || activeRec.previewAnalysis);
+            if (!activeAnalysis) return;
+
+            const showInSandbox = mode === 'analysis' && $('liveArrowCheckbox') && $('liveArrowCheckbox').checked;
+            const showInHistory = viewIdx < game.history.length - 1;
+            if (!showInSandbox && !showInHistory) return;
+
+            const best = activeAnalysis.bestMove;
+            const played = activeRec.move;
+            if (!best) return;
+            if (best.from.r === played.from.r && best.from.c === played.from.c && best.to.r === played.to.r && best.to.c === played.to.c) return;
+
+            const vc1 = flipped ? 7 - best.from.c : best.from.c;
+            const vr1 = flipped ? 7 - best.from.r : best.from.r;
+            const vc2 = flipped ? 7 - best.to.c : best.to.c;
+            const vr2 = flipped ? 7 - best.to.r : best.to.r;
+
+            const x1 = vc1 * 100 + 50, y1 = vr1 * 100 + 50;
+            const x2 = vc2 * 100 + 50, y2 = vr2 * 100 + 50;
+            const ang = Math.atan2(y2 - y1, x2 - x1);
+            const len = Math.hypot(x2 - x1, y2 - y1);
+            const head = 32;
+            const ex = x1 + Math.cos(ang) * (len - 18);
+            const ey = y1 + Math.sin(ang) * (len - 18);
+            const p1x = ex - head * Math.cos(ang - Math.PI / 6);
+            const p1y = ey - head * Math.sin(ang - Math.PI / 6);
+            const p2x = ex - head * Math.cos(ang + Math.PI / 6);
+            const p2y = ey - head * Math.sin(ang + Math.PI / 6);
+
+            svg.innerHTML = `
+                <g opacity="0.85">
+                    <line x1="${x1}" y1="${y1}" x2="${ex - Math.cos(ang) * 12}" y2="${ey - Math.sin(ang) * 12}"
+                        stroke="#22c55e" stroke-width="15" stroke-linecap="round"/>
+                    <polygon points="${ex},${ey} ${p1x},${p1y} ${p2x},${p2y}" fill="#22c55e"/>
+                </g>
+            `;
+        }
+
+        function pickSquare(r, c) {
+            const canMove = mode === 'analysis' || game.turn === humanSide;
+            if (!canMove) return;
+            const p = game.board[r][c];
+            if (p && p.color === game.turn) {
+                selected = { r, c };
+                selectedMoves = game.legalMoves(game.turn).filter(m => m.from.r === r && m.from.c === c);
+            } else {
+                selected = null;
+                selectedMoves = [];
+            }
+            renderBoard();
+        }
+
+        function onSquareClick(r, c) {
+            if (viewIdx !== game.history.length - 1) {
+                goToIndex(game.history.length - 1);
+                return;
+            }
+            if (isOver || botThinking) return;
+            if (mode === 'bot' && game.turn !== humanSide) return;
+
+            if (selected) {
+                const target = selectedMoves.find(m => m.to.r === r && m.to.c === c);
+                if (target) {
+                    tryMove(selected, { r, c }, true);
+                    return;
+                }
+            }
+
+            if (selected && selected.r === r && selected.c === c) {
+                selected = null;
+                selectedMoves = [];
+                renderBoard();
+                return;
+            }
+            pickSquare(r, c);
+        }
+
+        function tryMove(from, to, animate) {
+            const leg = game.legalMoves(game.turn);
+            const matches = leg.filter(m => m.from.r === from.r && m.from.c === from.c && m.to.r === to.r && m.to.c === to.c);
+            if (!matches.length) {
+                selected = null;
+                selectedMoves = [];
+                renderBoard();
+                return;
+            }
+            if (matches.length > 1 && matches[0].promotion) {
+                pendingPromo = { from, to, color: game.turn, animate };
+                openPromo(game.turn);
+                return;
+            }
+            finishMove(matches[0], animate);
+        }
+
+        function openPromo(color) {
+            const modal = $('promotionModal');
+            const box = $('promotionChoices');
+            box.innerHTML = '';
+            ['q', 'r', 'b', 'n'].forEach(t => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'promo-btn';
+                btn.innerHTML = PIECE_SVG[color + t.toUpperCase()] || '';
+                btn.addEventListener('click', () => {
+                    modal.classList.add('hidden');
+                    if (!pendingPromo) return;
+                    const leg = game.legalMoves(pendingPromo.color);
+                    const chosen = leg.find(m =>
+                        m.from.r === pendingPromo.from.r && m.from.c === pendingPromo.from.c &&
+                        m.to.r === pendingPromo.to.r && m.to.c === pendingPromo.to.c && m.promotion === t
+                    );
+                    const anim = pendingPromo.animate;
+                    pendingPromo = null;
+                    if (chosen) finishMove(chosen, anim);
+                });
+                box.appendChild(btn);
+            });
+            modal.classList.remove('hidden');
+        }
+
+        function updateEvalBar(cp) {
+            const bBar = $('evalBlackBar');
+            const lbl = $('evalLabel');
+            if (!bBar || !lbl) return;
+            if (Math.abs(cp) > 80000) {
+                bBar.style.height = cp > 0 ? '5%' : '95%';
+                lbl.textContent = cp > 0 ? '+M' : '-M';
+                return;
+            }
+            const pawns = cp / 100;
+            const cl = Math.max(-10, Math.min(10, pawns));
+            const wPct = 50 + 50 * (2 / (1 + Math.exp(-0.38 * cl)) - 1);
+            bBar.style.height = (100 - wPct).toFixed(1) + '%';
+            lbl.textContent = Math.abs(pawns) < 0.05 ? '0.0' : (pawns > 0 ? '+' : '') + pawns.toFixed(1);
+        }
+
+        function updateCaptured() {
+            const sym = { p: '♟', n: '♞', b: '♝', r: '♜', q: '♛' };
+            const ord = ['q', 'r', 'b', 'n', 'p'];
+            const capW = [], capB = [];
+            let matW = 0, matB = 0;
+
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const p = game.board[r][c];
+                    if (!p || p.type === 'k') continue;
+                    if (p.color === 'w') matW += VAL[p.type];
+                    else matB += VAL[p.type];
+                }
+            }
+            for (const rec of game.history) {
+                if (rec.captured) {
+                    if (rec.color === 'w') capW.push(rec.captured.type);
+                    else capB.push(rec.captured.type);
+                }
+            }
+
+            function fmt(list, diff) {
+                list.sort((a, b) => ord.indexOf(a) - ord.indexOf(b));
+                let s = list.map(t => `<span>${sym[t]}</span>`).join('');
+                if (diff > 0) s += `<span class="mono" style="font-size:11px;font-weight:800;color:#34d399;margin-left:4px;">+${Math.round(diff / 100)}</span>`;
+                return s || '<span style="font-size:11px;color:#64748b;">Нет взятий</span>';
+            }
+
+            $('bottomCaptured').innerHTML = fmt(flipped ? capB : capW, flipped ? matB - matW : matW - matB);
+            $('topCaptured').innerHTML = fmt(flipped ? capW : capB, flipped ? matW - matB : matB - matW);
+        }
+
+        function updateCoach(rec, idx) {
+            const box = $('coachBox');
+            if (!rec || !rec.analysis) {
+                box.classList.add('hidden');
+                return;
+            }
+            box.classList.remove('hidden');
+            const c = rec.analysis.cls;
+            const badge = $('coachBadge');
+            badge.style.background = c.color;
+            badge.textContent = c.symbol;
+            const mNum = Math.floor(idx / 2) + 1;
+            $('coachTitle').textContent = `${mNum}${rec.color === 'w' ? '.' : '...'} ${rec.san} — ${c.name}`;
+            const pv = (rec.analysis.evalAfter / 100).toFixed(1);
+            $('coachEval').textContent = (rec.analysis.evalAfter >= 0 ? '+' : '') + pv;
+            $('coachText').textContent = rec.analysis.explanation;
+        }
+
+        function updateHistory() {
+            const list = $('historyList');
+            $('moveCountLabel').textContent = `Ход: ${game.fullMoveNumber}`;
+            if (!game.history.length) {
+                list.innerHTML = `<div style="text-align:center;color:#64748b;padding:24px 8px;font-family:sans-serif;font-size:12px;">Сделайте первый ход, чтобы начать партию</div>`;
+                return;
+            }
+
+            function chip(rec, idx) {
+                if (!rec) return '<div></div>';
+                const active = idx === viewIdx ? 'active' : '';
+                const tag = rec.analysis
+                    ? `<span class="mini-cls-tag" style="background:${rec.analysis.cls.color};">${rec.analysis.cls.symbol}</span>`
+                    : '';
+                return `<button type="button" class="move-chip ${active}" data-idx="${idx}"><span>${rec.san}</span>${tag}</button>`;
+            }
+
+            let html = '';
+            for (let i = 0; i < game.history.length; i += 2) {
+                html += `<div class="history-row"><span style="color:#64748b;font-weight:700;">${Math.floor(i / 2) + 1}.</span>${chip(game.history[i], i)}${chip(game.history[i + 1], i + 1)}</div>`;
+            }
+            list.innerHTML = html;
+            list.querySelectorAll('.move-chip').forEach(btn => {
+                btn.addEventListener('click', () => goToIndex(parseInt(btn.dataset.idx, 10)));
+            });
+            list.scrollTop = list.scrollHeight;
+        }
+
+        function updateTurnUI() {
+            const b = $('turnBadge');
+            if (isOver) {
+                b.className = 'status-pill game-over';
+                b.textContent = 'Партия завершена';
+                return;
+            }
+            if (mode === 'analysis') {
+                b.className = 'status-pill';
+                b.textContent = game.turn === 'w' ? 'Ход Белых' : 'Ход Чёрных';
+                return;
+            }
+            if (game.turn === humanSide) {
+                b.className = 'status-pill';
+                b.textContent = game.isInCheck(humanSide) ? 'ШАХ! Ваш ход' : 'Ваш ход';
+            } else {
+                b.className = 'status-pill bot-turn';
+                b.textContent = 'Ход бота';
+            }
+        }
+
+        function goToIndex(idx) {
+            if (!game.history.length) return;
+            const prev = viewIdx;
+            viewIdx = Math.max(-1, Math.min(game.history.length - 1, idx));
+            selected = null;
+            selectedMoves = [];
+            const anim = (viewIdx === prev + 1 && viewIdx >= 0) ? game.history[viewIdx].move : null;
+            renderBoard(anim);
+            renderArrow();
+            updateHistory();
+            if (viewIdx >= 0) {
+                const r = game.history[viewIdx];
+                if (r.analysis) {
+                    updateEvalBar(r.analysis.evalAfter);
+                    updateCoach(r, viewIdx);
+                }
+            } else {
+                updateEvalBar(0);
+                $('coachBox').classList.add('hidden');
+            }
+        }
+
+        function finishMove(m, animate) {
+            hint = null;
+            selected = null;
+            selectedMoves = [];
+
+            const mover = game.turn;
+            if (!canMoveBeforeFlag(mover)) return;
+            const clockBefore = captureClockState();
+            const nextSide = mover === 'w' ? 'b' : 'w';
+            if (!advanceClockAfterMove(mover, nextSide)) return;
+
+            const idx = game.history.length;
+            const prevAn = idx > 0 ? game.history[idx - 1].analysis : null;
+            const rec = game.commitMove(m);
+            rec.clockBefore = clockBefore;
+            rec.previewAnalysis = ai.quickAnalyzeMove(rec.snapshot);
+            viewIdx = game.history.length - 1;
+
+            const givesCheck = game.isInCheck(game.turn);
+            if (givesCheck) {
+                if (m.captured || m.isEnPassant) audio.play('capture');
+                audio.play('check');
+            }
+            else if (m.promotion) audio.play('promote');
+            else if (m.isCastle) audio.play('castle');
+            else if (m.captured || m.isEnPassant) audio.play('capture');
+            else audio.play('move');
+
+            updateCaptured();
+            updateHistory();
+            renderBoard(animate ? m : null);
+            renderArrow();
+
+            setTimeout(() => {
+                rec.analysis = ai.analyzeMove(rec.snapshot, m, idx, prevAn);
+                rec.previewAnalysis = null;
+                if (rec.analysis) {
+                    updateEvalBar(rec.analysis.evalAfter);
+                    if (rec.analysis.cls.key === 'brilliant') audio.play('brilliant');
+                    updateHistory();
+                    refreshReviewStats();
+                    if (viewIdx === idx) {
+                        renderBoard(rec.move);
+                        renderArrow();
+                        updateCoach(rec, idx);
+                    }
+                }
+            }, 60);
+
+            const st = game.status();
+            if (st.over) {
+                endGame(st);
+                return;
+            }
+            updateTurnUI();
+
+            if (mode === 'bot' && game.turn !== humanSide) {
+                runBotTurn();
+            }
+        }
+
+        function runBotTurn() {
+            botThinking = true;
+            $('thinkingBadge').classList.remove('hidden');
+            updateTurnUI();
+
+            setTimeout(() => {
+                if (isOver || mode !== 'bot') {
+                    botThinking = false;
+                    $('thinkingBadge').classList.add('hidden');
+                    return;
+                }
+                const res = ai.pickMove(game, elo);
+                botThinking = false;
+                $('thinkingBadge').classList.add('hidden');
+
+                if (!res || !res.move) {
+                    const st = game.status();
+                    if (st.over) endGame(st);
+                    return;
+                }
+
+                const idx = game.history.length;
+                const prevAn = idx > 0 ? game.history[idx - 1].analysis : null;
+                const mover = game.turn;
+                if (!canMoveBeforeFlag(mover)) return;
+                const clockBefore = captureClockState();
+                const nextSide = mover === 'w' ? 'b' : 'w';
+                if (!advanceClockAfterMove(mover, nextSide)) return;
+                const rec = game.commitMove(res.move);
+                rec.clockBefore = clockBefore;
+                viewIdx = game.history.length - 1;
+
+                const givesCheck = game.isInCheck(game.turn);
+                if (givesCheck) {
+                    if (res.move.captured || res.move.isEnPassant) audio.play('capture');
+                    audio.play('check');
+                }
+                else if (res.move.promotion) audio.play('promote');
+                else if (res.move.isCastle) audio.play('castle');
+                else if (res.move.captured || res.move.isEnPassant) audio.play('capture');
+                else audio.play('move');
+
+                updateEvalBar(res.evalWhite);
+                updateCaptured();
+                updateHistory();
+                renderBoard(res.move);
+
+                setTimeout(() => {
+                    rec.analysis = ai.analyzeMove(rec.snapshot, res.move, idx, prevAn);
+                    rec.previewAnalysis = null;
+                    updateHistory();
+                    refreshReviewStats();
+                    if (viewIdx === idx) {
+                        renderBoard(res.move);
+                        renderArrow();
+                        updateCoach(rec, idx);
+                    }
+                }, 60);
+
+                const st = game.status();
+                if (st.over) {
+                    endGame(st);
+                    return;
+                }
+                updateTurnUI();
+            }, elo <= 800 ? 220 : 110);
+        }
+
+        function endGame(st) {
+            isOver = true;
+            clockRunningSide = null;
+            clockLastTick = 0;
+            updateClockUI();
+            audio.play('gameover');
+            updateTurnUI();
+            const modal = $('gameOverModal');
+            if (st.winner === 'draw') {
+                $('gameOverIcon').textContent = '🤝';
+                $('gameOverTitle').textContent = 'Ничья!';
+            } else if (mode === 'analysis') {
+                $('gameOverIcon').textContent = '🏆';
+                $('gameOverTitle').textContent = st.winner === 'w' ? 'Победа Белых!' : 'Победа Чёрных!';
+            } else if (st.winner === humanSide) {
+                $('gameOverIcon').textContent = '🏆';
+                $('gameOverTitle').textContent = 'Вы победили!';
+            } else {
+                $('gameOverIcon').textContent = '💀';
+                $('gameOverTitle').textContent = 'Поражение';
+            }
+            $('gameOverReason').textContent = st.reason;
+            modal.classList.remove('hidden');
+        }
+
+        function newGame() {
+            if (botThinking) return;
+            game.reset();
+            ai.tt.clear();
+            selected = null;
+            selectedMoves = [];
+            hint = null;
+            pendingPromo = null;
+            isOver = false;
+            viewIdx = -1;
+            activeTimeControl = selectedTimeControl;
+            resetClockState();
+
+            if (mode === 'analysis') {
+                humanSide = 'w';
+                flipped = false;
+                $('bottomSideBadge').textContent = 'Белые';
+            } else {
+                humanSide = colorPref === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : colorPref;
+                flipped = humanSide === 'b';
+                $('bottomSideBadge').textContent = humanSide === 'w' ? 'Белые' : 'Чёрные';
+            }
+
+            $('gameOverModal').classList.add('hidden');
+            $('promotionModal').classList.add('hidden');
+            $('coachBox').classList.add('hidden');
+            $('reviewReadyDot').classList.add('hidden');
+
+            buildReviewTableEmpty();
+            refreshReviewStats();
+            updateCaptured();
+            updateHistory();
+            updateTurnUI();
+            updateEvalBar(0);
+            renderBoard();
+            renderArrow();
+
+            if (mode === 'bot' && game.turn !== humanSide) {
+                runBotTurn();
+            }
+        }
+
+        function runFullAnalysis() {
+            if (!game.history.length) {
+                toast('Сначала сделайте хотя бы один ход');
+                return;
+            }
+            toast('Анализирую партию...');
+            setTimeout(() => {
+                for (let i = 0; i < game.history.length; i++) {
+                    const r = game.history[i];
+                    if (!r.analysis) {
+                        const prevAn = i > 0 ? game.history[i - 1].analysis : null;
+                        r.analysis = ai.analyzeMove(r.snapshot, r.move, i, prevAn);
+                    }
+                }
+                refreshReviewStats();
+                updateHistory();
+                renderBoard();
+                renderArrow();
+                if (viewIdx >= 0) updateCoach(game.history[viewIdx], viewIdx);
+                $('gameOverModal').classList.add('hidden');
+                $('reviewReadyDot').classList.remove('hidden');
+                switchTab('review');
+                toast('Анализ готов');
+            }, 25);
+        }
+
+        function undoLast() {
+            if (botThinking || !game.history.length) return;
+            isOver = false;
+            $('gameOverModal').classList.add('hidden');
+            hint = null;
+            selected = null;
+            selectedMoves = [];
+
+            let clockStateToRestore = null;
+            if (mode === 'bot' && game.turn === humanSide && game.history.length >= 2) {
+                game.history.pop();
+                const prev = game.history.pop();
+                clockStateToRestore = prev.clockBefore;
+                game.restoreState(prev.snapshot);
+            } else {
+                const prev = game.history.pop();
+                clockStateToRestore = prev.clockBefore;
+                game.restoreState(prev.snapshot);
+            }
+            restoreClockState(clockStateToRestore);
+            viewIdx = game.history.length - 1;
+
+            game.posCounts.clear();
+            for (const h of game.history) {
+                const t = new ChessGame();
+                t.restoreState(h.snapshot);
+                const k = t.posKey();
+                game.posCounts.set(k, (game.posCounts.get(k) || 0) + 1);
+            }
+            game.recordPos();
+
+            updateCaptured();
+            updateHistory();
+            updateTurnUI();
+            refreshReviewStats();
+            updateEvalBar(ai.evalWhite(game, true));
+            renderBoard();
+            renderArrow();
+            toast('Ход отменён');
+        }
+
+        function showHint() {
+            if (isOver || botThinking) return;
+            if (mode === 'bot' && game.turn !== humanSide) return;
+            const res = ai.pickMove(game, 3200);
+            if (res && res.move) {
+                hint = res.move;
+                renderBoard();
+                const san = game.toSAN(res.move, game.legalMoves(game.turn));
+                toast('Рекомендуемый ход: ' + san);
+            }
+        }
+
+        function bindEvents() {
+            $('modeBotBtn').addEventListener('click', () => setMode('bot'));
+            $('modeAnalysisBtn').addEventListener('click', () => setMode('analysis'));
+
+            $('timeControlSelect').addEventListener('change', applySelectedTimeControl);
+            $('customMinutes').addEventListener('change', () => {
+                if ($('timeControlSelect').value === 'custom') applySelectedTimeControl();
+            });
+            $('customIncrement').addEventListener('change', () => {
+                if ($('timeControlSelect').value === 'custom') applySelectedTimeControl();
+            });
+
+            $('themeClassicBtn').addEventListener('click', () => setTheme('classic'));
+            $('themeWoodBtn').addEventListener('click', () => setTheme('wood'));
+            $('themeOceanBtn').addEventListener('click', () => setTheme('ocean'));
+
+            $('soundToggleBtn').addEventListener('click', () => {
+                audio.muted = !audio.muted;
+                $('soundIcon').textContent = audio.muted ? '🔇' : '🔊';
+                if (!audio.muted) audio.play('move');
+                toast(audio.muted ? 'Звук выключен' : 'Звук включён');
+            });
+
+            $('eloSlider').addEventListener('input', (e) => setElo(e.target.value));
+            $('eloNumberInput').addEventListener('change', (e) => setElo(e.target.value));
+
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    setElo(btn.dataset.elo);
+                    toast('Рейтинг бота: ' + elo + ' ELO');
+                });
+            });
+
+            function setColorOpt(c) {
+                colorPref = c;
+                $('colorWhiteBtn').classList.toggle('active', c === 'w');
+                $('colorRandomBtn').classList.toggle('active', c === 'random');
+                $('colorBlackBtn').classList.toggle('active', c === 'b');
+            }
+            $('colorWhiteBtn').addEventListener('click', () => setColorOpt('w'));
+            $('colorRandomBtn').addEventListener('click', () => setColorOpt('random'));
+            $('colorBlackBtn').addEventListener('click', () => setColorOpt('b'));
+
+            $('newGameBtn').addEventListener('click', newGame);
+            $('resetSandboxBtn').addEventListener('click', newGame);
+            $('modalNewGameBtn').addEventListener('click', newGame);
+            $('modalBoardBtn').addEventListener('click', () => $('gameOverModal').classList.add('hidden'));
+            $('modalReviewBtn').addEventListener('click', runFullAnalysis);
+
+            $('undoBtn').addEventListener('click', undoLast);
+            $('hintBtn').addEventListener('click', showHint);
+            $('analyzeBtn').addEventListener('click', runFullAnalysis);
+            $('recalcReviewBtn').addEventListener('click', runFullAnalysis);
+            $('flipBtn').addEventListener('click', () => {
+                flipped = !flipped;
+                updateCaptured();
+                refreshReviewStats();
+                renderBoard();
+                renderArrow();
+            });
+            $('resignBtn').addEventListener('click', () => {
+                if (isOver || botThinking || mode !== 'bot') return;
+                endGame({ over: true, winner: humanSide === 'w' ? 'b' : 'w', reason: 'Вы сдались' });
+            });
+
+            $('liveArrowCheckbox').addEventListener('change', renderArrow);
+
+            $('navStartBtn').addEventListener('click', () => goToIndex(-1));
+            $('navPrevBtn').addEventListener('click', () => goToIndex(viewIdx - 1));
+            $('navNextBtn').addEventListener('click', () => goToIndex(viewIdx + 1));
+            $('navEndBtn').addEventListener('click', () => goToIndex(game.history.length - 1));
+
+            $('tabSetupBtn').addEventListener('click', () => switchTab('setup'));
+            $('tabReviewBtn').addEventListener('click', () => switchTab('review'));
+
+            window.addEventListener('pointermove', (ev) => {
+                if (!dragActive) return;
+                const g = $('dragGhost');
+                g.style.left = ev.clientX + 'px';
+                g.style.top = ev.clientY + 'px';
+            });
+
+            window.addEventListener('pointerup', (ev) => {
+                if (!dragActive) return;
+                dragActive = false;
+                const g = $('dragGhost');
+                g.classList.add('hidden');
+                document.querySelectorAll('.dragging-hidden').forEach(el => el.classList.remove('dragging-hidden'));
+
+                const movedDist = Math.hypot(ev.clientX - dragStart.x, ev.clientY - dragStart.y);
+                const grid = $('chessGrid');
+                if (movedDist >= 6 && grid && dragFrom) {
+                    const rect = grid.getBoundingClientRect();
+                    if (ev.clientX >= rect.left && ev.clientX <= rect.right && ev.clientY >= rect.top && ev.clientY <= rect.bottom) {
+                        const cellW = rect.width / 8;
+                        const vc = Math.floor((ev.clientX - rect.left) / cellW);
+                        const vr = Math.floor((ev.clientY - rect.top) / cellW);
+                        const tr = flipped ? 7 - vr : vr;
+                        const tc = flipped ? 7 - vc : vc;
+                        if (tr !== dragFrom.r || tc !== dragFrom.c) {
+                            tryMove(dragFrom, { r: tr, c: tc }, true);
+                        }
+                    }
+                }
+                dragFrom = null;
+            });
+
+            window.addEventListener('keydown', (ev) => {
+                if (ev.target && ev.target.tagName === 'INPUT') return;
+                if (ev.key === 'ArrowLeft') goToIndex(viewIdx - 1);
+                if (ev.key === 'ArrowRight') goToIndex(viewIdx + 1);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                bindEvents();
+                selectedTimeControl = readSelectedTimeControl();
+                activeTimeControl = selectedTimeControl;
+                resetClockState();
+                clockIntervalId = window.setInterval(tickClock, 100);
+                buildReviewTableEmpty();
+                updateBotUI();
+                updateCaptured();
+                updateTurnUI();
+                renderBoard();
+            } catch (err) {
+                const grid = $('chessGrid');
+                if (grid) {
+                    grid.innerHTML = `<div style="grid-column:1/-1;grid-row:1/-1;display:flex;align-items:center;justify-content:center;padding:20px;background:#1e293b;color:#fecaca;font-size:13px;">Ошибка инициализации: ${err && err.message ? err.message : String(err)}</div>`;
+                }
+            }
+        });
+    })();
+    </script>
+</body>
+</html>
